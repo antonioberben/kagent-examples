@@ -1,0 +1,4 @@
+controller:
+  loglevel: debug
+app:
+  loglevel: debug

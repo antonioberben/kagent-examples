@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mcpk8s
+  name: mcpk8s
+  namespace: kagent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcpk8s
+  template:
+    metadata:
+      labels:
+        app: mcpk8s
+    spec:
+      serviceAccountName: mcpk8s
+      containers:
+      # - image: flux159/mcp-server-kubernetes
+      - image: antonioberben/mcp-server-kubernetes:amd
+        env:
+        - name: ENABLE_UNSAFE_SSE_TRANSPORT
+          value: "1"
+        - name: PORT
+          value: "3001"
+        - name: NODE_ENV
+          value: "production"
+        imagePullPolicy: Always
+        name: mcp-server-kubernetes
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "250m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mcpk8s
+  namespace: kagent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mcpk8s
+subjects:
+  - kind: ServiceAccount
+    name: mcpk8s
+    namespace: kagent
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mcpk8s
+  name: mcpk8s
+  namespace: kagent
+spec:
+  ports:
+  - port: 3001
+    protocol: TCP
+    targetPort: 3001
+  selector:
+    app: mcpk8s
+  type: LoadBalancer # Only for testing in local env
