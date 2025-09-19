@@ -13,7 +13,8 @@ ollama:
   models:
     pull:
       # - mistral
-      - llama2
+      # - Qwen/Qwen2-0.5B-Instruct-GPTQ-Int8
+      - nomic-embed-text:latest
 service:
 
   # -- Service type
