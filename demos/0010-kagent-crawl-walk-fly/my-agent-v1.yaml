@@ -10,6 +10,3 @@ spec:
   description: This is my test agent
   type: Declarative
 
-# Give me the lasagna recipe.
-# Create a deployment with name nginx and image nginx in the kagent namespace
-
