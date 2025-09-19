@@ -12,6 +12,3 @@ spec:
       Do not answer anything different than Kubernetes related topics.
   description: This is my test agent
   type: Declarative
-
-# Give me the lasagna recipe.
-# Create a deployment with name nginx and image nginx in the kagent namespace

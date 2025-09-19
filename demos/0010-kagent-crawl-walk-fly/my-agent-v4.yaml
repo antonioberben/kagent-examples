@@ -18,5 +18,3 @@ spec:
       type: Agent
   description: This is my test agent
   type: Declarative
-
-  # Create a deployment with name nginx and image nginx in the kagent namespace
