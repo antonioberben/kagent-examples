@@ -1,0 +1,12 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: my-agent-v1
+  namespace: kagent
+spec:
+  declarative:
+    modelConfig: default-model-config
+    stream: true
+  description: This is my test agent
+  type: Declarative
+
