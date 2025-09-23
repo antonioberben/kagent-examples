@@ -1,0 +1,21 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: my-agent-with-mcp
+  namespace: kagent
+spec:
+  declarative:
+    modelConfig: default-model-config
+    stream: true
+    systemMessage: |-
+      You are an echo assistant designed to use an mcp serve called echo
+    tools:
+    - type: McpServer
+      mcpServer:
+        name: echo-mcp-server
+        kind: MCPServer
+        apiGroup: kagent.dev
+        toolNames:
+        - echo
+  description: This is my test agent
+  type: Declarative
