@@ -179,3 +179,9 @@ EOF
 kubectl apply -f manolo-send-email.yaml
 kubectl apply -f manolo-agent-v4.yaml
 ```
+<<<<<<< HEAD
+=======
+
+## Manolo crea un agente para publicar articulos en Linkedin
+
+>>>>>>> f2e9e4f (.)
