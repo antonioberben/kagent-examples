@@ -13,6 +13,7 @@ This demo shows the evolution of agents from simple to more complex ones.
 Let's make istio apply encryption to all the communications in the kagent namespace. Now all the services in the kagent namespace will be able to communicate securely (mtls) and observable.
 
 ```bash
+# Only if you have installed Istio with Ambient mode
 kubectl label namespace kagent istio.io/dataplane-mode=ambient
 ```
 
@@ -65,6 +66,10 @@ kubectl apply -f my-agent-v2.yaml
 
 Access the UI and ask the same questions again. The agent will refuse to answer non-kubernetes related questions.
 
+```text
+What is the capital of France?
+```
+
 ## Stage 2: Walk
 
 The agent helps, but you want that you agent is able to run a task by its own. To do so, you need to give it access to `tools` (also called functions).
@@ -74,7 +79,7 @@ These actions can be anything, from calling an API, to running a script, to quer
 In this case, you want to connect to the kubernetes cluster and run kubectl commands. Kagent comes with an MCP Server with those tools:
 
 ```bash
-kubectl get kagent-tool-server -n kagent -oyaml
+kubectl get remotemcpserver kagent-tool-server -n kagent -oyaml
 ```
 
 Let's use it with our agent:
@@ -85,6 +90,10 @@ kubectl apply -f my-agent-v3.yaml
 
 Access the UI and ask the same questions again. The agent will be able to create the deployment in kubernetes.
 
+```text
+Create a deployment named 'nginx-deployment' using the nginx image in the existing 'kagent' namespace with 1 replica
+```
+
 ## Stage 3: Fly
 
 Now you want your agent to connect to other agents. This is useful for enterprise where different teams have different agents with different permissions.
@@ -92,16 +101,25 @@ Now you want your agent to connect to other agents. This is useful for enterpris
 Check the existing k8s-agent:
 
 ```bash
-kubectl get kagent k8s-agent -n kagent -oyaml
+kubectl get agent k8s-agent -n kagent -oyaml
 ```
 
-Deploy your own agent `my-agent`:
+Deploy your own agent `my-agent-v4`:
 
 ```bash
 kubectl apply -f my-agent-v4.yaml
 ```
 
-Access the UI and ask the same questions again. The agent will be able to create the deployment in kubernetes through the k8s-agent which has access to mcp server. You have entered the multi-agent world!
+Access the UI and try to perform a taks thorug the exisiting k8s-agent. You have entered the multi-agent world!
+
+```text
+Create a deployment named 'nginx-deployment2' using the nginx image in the existing 'kagent' namespace with 1 replica
+```
+
+> **Note:** If you try to delete, the k8s-agent will refuse because of the system prompt expects that the user confirms destructive actions. However, the default k8s-agent is not well configured, so it will fail. This is an example of the importance of fine-tuning the system prompt to your needs.
+
+
+### 360 Observability with Ambient Mesh (Optional)
 
 But this is useless if we cannot see anything. How can you ensure that the communication between agents is secure or even hapenning?
 

@@ -26,9 +26,13 @@ export OPENAI_API_KEY=
 ```
 
 ```bash
+export KAGENT_VERSION=0.7.4
+```
+
+```bash
 helm upgrade --install kagent-crds oci://ghcr.io/kagent-dev/kagent/helm/kagent-crds \
     --namespace kagent \
-    --version 0.6.8 \
+    --version $KAGENT_VERSION \
     --create-namespace
 ```
 
@@ -36,7 +40,7 @@ helm upgrade --install kagent-crds oci://ghcr.io/kagent-dev/kagent/helm/kagent-c
 helm upgrade --install kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent \
     --namespace kagent \
     --create-namespace \
-    --version 0.6.8 \
+    --version $KAGENT_VERSION \
     --set providers.openAI.apiKey=$OPENAI_API_KEY \
     --set service.type=LoadBalancer
 ```
