@@ -1,0 +1,21 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: manolo-agent-v2
+  namespace: kagent
+spec:
+  declarative:
+    modelConfig: default-model-config
+    stream: true
+    systemMessage: "''"
+    tools:
+    - mcpServer:
+        apiGroup: kagent.dev
+        kind: RemoteMCPServer
+        name: kagent-tool-server
+        toolNames:
+        - k8s_apply_manifest
+        - k8s_get_resources
+      type: McpServer
+  description: This is my test agent
+  type: Declarative
