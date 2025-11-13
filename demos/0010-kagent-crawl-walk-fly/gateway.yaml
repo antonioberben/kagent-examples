@@ -27,7 +27,7 @@ spec:
   rules:
     - backendRefs:
         - name: kagent-ui
-          port: 80
+          port: 8080
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: HTTPListenerPolicy
