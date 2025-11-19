@@ -1,0 +1,19 @@
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: sendgrid-mcp
+  namespace: kagent
+spec:
+  deployment:
+    args:
+    - "/sendgrid/build/index.js"
+    cmd: node
+    env:
+      READ_ONLY: "false"
+      SENDGRID_API_KEY: 
+      MCP_SERVER_VERSION: 1.0.0
+      LOG_LEVEL: "debug"
+    image: fjvicens/sendgrid-mcp:1.0.6
+    port: 3000
+  stdioTransport: {}
+  transportType: stdio
