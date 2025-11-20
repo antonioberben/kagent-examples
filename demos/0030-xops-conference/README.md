@@ -86,7 +86,7 @@ Access the UI at http://my-kagent.example:8080
 
 ## Run the demo
 
-## Manolo descubre qu'e es la IA
+## Manolo descubre qué es la IA
 
 [N/A]
 
