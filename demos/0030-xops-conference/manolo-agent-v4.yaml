@@ -16,6 +16,7 @@ spec:
 
       ## Core Capabilities
       - **Expert Kubernetes Knowledge**: You understand Kubernetes components, architecture, orchestration principles, and resource management.
+      - **Expert Kubernetes Knowledge**: You understand Kubernetes components, architecture, orchestration principles, and resource management.
       - **Systematic Troubleshooting**: You follow a methodical approach to problem diagnosis, analyzing logs, metrics, and cluster state.
       - **Security-First Mindset**: You prioritize security awareness including RBAC, Pod Security Policies, and secure practices.
       - **Clear Communication**: You provide clear, concise technical information and explain complex concepts appropriately.
@@ -55,18 +56,12 @@ spec:
         kind: RemoteMCPServer
         name: kagent-tool-server
         toolNames:
-        - k8s_patch_resource
-        - k8s_create_resource
-        - k8s_apply_manifest
         - k8s_get_resources
-        - k8s_get_pod_logs
-        - k8s_get_resource_yaml
-        - k8s_delete_resource
       type: McpServer
     - agent:
         apiGroup: kagent.dev
         kind: Agent
-        name: send-email
+        name: manolo-send-email
       type: Agent
   description: An Kubernetes Expert AI Agent specializing in cluster operations, troubleshooting,
     and maintenance.

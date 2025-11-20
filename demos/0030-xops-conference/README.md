@@ -113,6 +113,38 @@ kubectl apply -f manolo-agent-v1.yaml
 
 Manolo aplica guardrails.
 
+
+```bash
+kubectl apply -f manolo-agent-v2.yaml
+```
+
+Manolo un gateway para aplicar AuthN y AuthZ
+
+```bash
+kubectl apply -f manolo-agentgateway.yaml
+kubectl apply -f manolo-agent-v3.yaml
+```
+
+Crea un namespace
+
+Aplica la politica
+
+```bash
+kubectl apply -f manolo-agentgateway-policy.yaml
+```
+
+Crea otro nuvo namespace y prueba queno puede crear recursos
+
+
+```bash
+kubectl delete -f manolo-agentgateway.yaml
+kubectl delete -f manolo-agentgateway-policy.yaml
+```
+
+## Manolo aplica Agentic AI (multi-agent, A2A)
+
+Manolo crea un MCP para enviar correos y un agente
+
 ```bash
 export EMAIL_SERVER_KEY=
 ```
@@ -142,22 +174,8 @@ spec:
 EOF
 ```
 
-```bash
-kubectl apply -f manolo-agent-v2.yaml
-```
-
-Manolo un gateway para aplicar AuthN y AuthZ
 
 ```bash
-kubectl apply -f manolo-agentgateway.yaml
-kubectl apply -f manolo-agent-v3.yaml
-```
-
-## Manolo aplica Agentic AI (multi-agent, A2A)
-
-Manolo crea un MCP para enviar correos y un agente
-
-```bash
-kubectl apply -f manolo-agent-v3a.yaml
-kubectl apply -f manolo-agent-v3b.yaml
+kubectl apply -f manolo-send-email.yaml
+kubectl apply -f manolo-agent-v4.yaml
 ```

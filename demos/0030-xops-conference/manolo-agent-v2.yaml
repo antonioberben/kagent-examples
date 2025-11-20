@@ -52,7 +52,7 @@ spec:
     - mcpServer:
         apiGroup: kagent.dev
         kind: RemoteMCPServer
-        name: tools-server-v2
+        name: kagent-tool-server
         toolNames:
         - k8s_patch_resource
         - k8s_create_resource

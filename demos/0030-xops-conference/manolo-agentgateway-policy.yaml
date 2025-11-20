@@ -7,11 +7,11 @@ metadata:
     app: agentgateway
 spec:
   targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
+  - group: gateway.kgateway.dev
+    kind: Backend
     name: tools-server-v2
   rbac:
-    # action: Allow
+    action: Allow
     policy:
       matchExpressions:
-        - 'mcp.tool.name == "k8s_delete_resource"'
+        - 'mcp.tool.name == "k8s_get_resources"'

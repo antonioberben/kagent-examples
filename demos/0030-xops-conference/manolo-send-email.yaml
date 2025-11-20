@@ -12,10 +12,27 @@ spec:
 
       # Instructions
           - Send email from admin@edgecloudlabs.com
-          - Send email to <TEMP_EMAIL_RECIPIENT>
-          - Email format is HTML
+          - Send email to the given email address
+          - Email format is HTML, not markdown or plain text
           - Subject follow this format "Reporte incidencia <numero_incidencia>"
           - The text is the incident report
+          - Use the template ID: d-49123c709c674a05bdfd6d44c009f33e
+          - The dynamic_template_data must have the "reporte" and "incidencia" fields
+          - The incidencia field is uuid auto generated
+    a2aConfig:
+      skills:
+      - description: The ability to send email reports about Kubernetes clusters
+        examples:
+        - Send an incident report email to the given address
+        - Use the SendGrid MCP to send emails
+        - Send email to notify about cluster issues
+        - Use HTML format for the email body
+        - Use the template ID
+        id: cluster-diagnostics
+        name: Cluster Diagnostics
+        tags:
+        - cluster
+        - diagnostics
     tools:
     - mcpServer:
         apiGroup: kagent.dev
