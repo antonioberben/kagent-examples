@@ -1,0 +1,28 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: manolo-send-email
+  namespace: kagent
+spec:
+  declarative:
+    modelConfig: default-model-config
+    stream: true
+    systemMessage: |-
+      You're a helpful email sender agent.
+
+      # Instructions
+          - Send email from admin@edgecloudlabs.com
+          - Send email to <TEMP_EMAIL_RECIPIENT>
+          - Email format is HTML
+          - Subject follow this format "Reporte incidencia <numero_incidencia>"
+          - The text is the incident report
+    tools:
+    - mcpServer:
+        apiGroup: kagent.dev
+        kind: MCPServer
+        name: sendgrid-mcp
+        toolNames:
+        - send_mail
+      type: McpServer
+  description: This agent send incident report emails
+  type: Declarative

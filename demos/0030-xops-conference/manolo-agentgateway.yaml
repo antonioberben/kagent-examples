@@ -1,0 +1,55 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: tools-server-v2
+  namespace: kagent
+spec:
+  type: MCP
+  mcp:
+    targets:
+    - name: mcp-target
+      static:
+        host: kagent-tools.kagent.svc.cluster.local
+        port: 8084
+        protocol: StreamableHTTP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tools-server-v2-agentgateway
+  namespace: kagent
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+  - protocol: HTTP
+    port: 8084
+    name: http
+    allowedRoutes:
+      namespaces:
+        from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: tools-server-v2
+  namespace: kagent
+spec:
+  parentRefs:
+  - name: tools-server-v2-agentgateway
+    namespace: kagent
+  rules:
+    - backendRefs:
+      - name: tools-server-v2
+        group: gateway.kgateway.dev
+        kind: Backend
+---
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: tools-server-v2
+  namespace: kagent
+spec:
+  sseReadTimeout: 5m0s
+  timeout: 30s
+  url: http://tools-server-v2-agentgateway.kagent.svc.cluster.local:8084/mcp
+  description: "Kagent Tools Server"
