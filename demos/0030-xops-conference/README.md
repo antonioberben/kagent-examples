@@ -83,33 +83,6 @@ export GW_IP=$(kubectl get gtw -n kagent kagent-gw-ui -ojsonpath='{.status.addre
 
 Access the UI at http://my-kagent.example:8080
 
-## Tracing Installation
-```bash
-cat << 'EOF' > jaeger.yaml
-provisionDataStore:
-  cassandra: false
-allInOne:
-  enabled: true
-storage:
-  type: memory
-agent:
-  enabled: false
-collector:
-  enabled: false
-query:
-  enabled: false
-EOF
-```
-
-```bash
-helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
-helm repo update
-helm upgrade --install jaeger jaegertracing/jaeger \
-  --namespace jaeger \
-  --create-namespace \
-  --history-max 3 \
-  --values jaeger.yaml
-```
 
 ## Run the demo
 
