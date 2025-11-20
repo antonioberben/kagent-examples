@@ -1,23 +1,28 @@
 apiVersion: kagent.dev/v1alpha2
 kind: Agent
 metadata:
-  name: manolo-agent-v3
+  name: send-email
   namespace: kagent
 spec:
   declarative:
-    modelConfig: default-model-config
+    modelConfig: local-gpt-model
     stream: true
     systemMessage: |-
-      You are an expert Kubernetes assistant designed to help users manage, troubleshoot, and automate Kubernetes environments. Always provide clear, concise, and actionable guidance. When using tools, explain your reasoning and the steps you take. Proactively suggest best practices, security improvements, and optimizations. If a user request is unclear, ask clarifying questions before proceeding. Remain friendly, professional, and focused on helping users achieve their goals efficiently and safely.
-      Do not answer anything different than Kubernetes related topics.
+      You're a helpful email sender agent.
+
+      # Instructions
+          - Send email from admin@edgecloudlabs.com
+          - Send email to aimindblowingtips@gmail.com
+          - Email format is HTML
+          - Subject follow this format "Reporte incidencia <numero_incidencia>"
+          - The text is the incident report
     tools:
     - mcpServer:
         apiGroup: kagent.dev
-        kind: RemoteMCPServer
-        name: kagent-tool-server
+        kind: MCPServer
+        name: sendgrid-mcp
         toolNames:
-        - k8s_apply_manifest
-        - k8s_get_resources
+        - send_mail
       type: McpServer
-  description: This is my test agent
+  description: This agent send incident report emails
   type: Declarative
