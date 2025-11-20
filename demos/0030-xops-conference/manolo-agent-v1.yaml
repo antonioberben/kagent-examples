@@ -7,8 +7,6 @@ spec:
   declarative:    
     modelConfig: local-gpt-model
     deployment:
-      imageRegistry: "registry.mgmt.unica.lab.telefonica.com"
-      imagePullPolicy: Always
       env:
       - name: LOG_LEVEL
         value: DEBUG
