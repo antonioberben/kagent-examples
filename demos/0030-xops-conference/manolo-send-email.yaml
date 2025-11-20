@@ -21,18 +21,19 @@ spec:
           - The incidencia field is uuid auto generated
     a2aConfig:
       skills:
-      - description: The ability to send email reports about Kubernetes clusters
+      - description: The ability to send a pods report email when requested by another agent
         examples:
-        - Send an incident report email to the given address
-        - Use the SendGrid MCP to send emails
-        - Send email to notify about cluster issues
+        - Send a pods report email to the given address
+        - Use the SendGrid MCP to send a report of all running pods
+        - Email should include pod names, statuses, and resource usage
         - Use HTML format for the email body
         - Use the template ID
-        id: cluster-diagnostics
-        name: Cluster Diagnostics
+        id: pods-report
+        name: Pods Report Sender
         tags:
-        - cluster
-        - diagnostics
+        - pods
+        - report
+        - email
     tools:
     - mcpServer:
         apiGroup: kagent.dev
