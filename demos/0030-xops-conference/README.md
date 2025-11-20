@@ -83,6 +83,33 @@ export GW_IP=$(kubectl get gtw -n kagent kagent-gw-ui -ojsonpath='{.status.addre
 
 Access the UI at http://my-kagent.example:8080
 
+## Tracing Installation
+```bash
+cat << 'EOF' > jaeger.yaml
+provisionDataStore:
+  cassandra: false
+allInOne:
+  enabled: true
+storage:
+  type: memory
+agent:
+  enabled: false
+collector:
+  enabled: false
+query:
+  enabled: false
+EOF
+```
+
+```bash
+helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+helm repo update
+helm upgrade --install jaeger jaegertracing/jaeger \
+  --namespace jaeger \
+  --create-namespace \
+  --history-max 3 \
+  --values jaeger.yaml
+```
 
 ## Run the demo
 
@@ -94,7 +121,7 @@ Access the UI at http://my-kagent.example:8080
 
 [N/A]
 
-## Manolo use RAG con la IA
+## Manolo usa RAG con la IA
 
 
 ## Manolo conecta a los servicios de su empresa con agentes de IA y servidores MCP
@@ -104,19 +131,12 @@ Manolo descubre kagent. Despliega un agente.
 ```bash
 kubectl apply -f manolo-agent-v1.yaml
 ```
-
-Manolo conecta su agente a su servidor MCP corporativo.
-
-```bash
-kubectl apply -f manolo-agent-v2.yaml
-```
-
 ## Manolo aplica seguridad con agentgateway
 
 Manolo aplica gardrails.
 
 ```bash
-kubectl apply -f manolo-agent-v3.yaml
+kubectl apply -f manolo-agent-v2.yaml
 ```
 
 Manolo un gateway para aplicar AuthN y AuthZ
@@ -127,9 +147,9 @@ kubectl apply -f manolo-agentgateway.yaml
 
 ## Manolo aplica Agentic AI (multi-agent, A2A)
 
-```bash
-kubectl apply -f manolo-agent-v4.yaml
-```
+Manolo crea un MCP para enviar correos y un agente
 
-## Manolo crea un agente para publicar articulos en Linkedin
+```bash
+kubectl apply -f manolo-agent-v3.yaml
+```
 
