@@ -64,14 +64,19 @@ helm upgrade -i kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway \
     --create-namespace \
     --version $KGATEWAY_VERSION \
     --set controller.image.pullPolicy=Always \
-    --set agentGateway.enabled=true \
-    --set agentGateway.enableAlphaAPIs=true
+    --set agentgateway.enabled=true \
+    --set agentgateway.enableAlphaAPIs=true
 ```
 
 Deploy a gateway to access the kagent UI:
 
 ```bash
 kubectl apply -f gateway.yaml
+```
+
+```bash
+sleep 5
+kubectl rollout status deploy kagent-gw-ui -n kagent --timeout=90s
 ```
 
 Get the gateway IP and register a domain:
@@ -94,19 +99,48 @@ Access the UI at http://my-kagent.example:8080
 
 [N/A]
 
-## Manolo usa RAG con la IA
-
-
 ## Manolo conecta a los servicios de su empresa con agentes de IA y servidores MCP
 
 Manolo descubre kagent. Despliega un agente.
 
+En un openshift esto falla. Utiliza el propio agente para arreglarlo.
+
 ```bash
 kubectl apply -f manolo-agent-v1.yaml
 ```
+
 ## Manolo aplica seguridad con agentgateway
 
-Manolo aplica gardrails.
+Manolo aplica guardrails.
+
+```bash
+export EMAIL_SERVER_KEY=
+```
+
+```bash
+kubectl apply -f -<<EOF
+apiVersion: kagent.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: sendgrid-mcp
+  namespace: kagent
+spec:
+  deployment:
+    args:
+    - "/sendgrid/build/index.js"
+    cmd: node
+    env:
+      READ_ONLY: "false"
+      SENDGRID_API_KEY: ${EMAIL_SERVER_KEY}
+      MCP_SERVER_VERSION: 1.0.0
+      LOG_LEVEL: "debug"
+    
+    image: fjvicens/sendgrid-mcp:1.0.6
+    port: 3000
+  stdioTransport: {}
+  transportType: stdio
+EOF
+```
 
 ```bash
 kubectl apply -f manolo-agent-v2.yaml
@@ -116,6 +150,7 @@ Manolo un gateway para aplicar AuthN y AuthZ
 
 ```bash
 kubectl apply -f manolo-agentgateway.yaml
+kubectl apply -f manolo-agent-v3.yaml
 ```
 
 ## Manolo aplica Agentic AI (multi-agent, A2A)
@@ -123,6 +158,6 @@ kubectl apply -f manolo-agentgateway.yaml
 Manolo crea un MCP para enviar correos y un agente
 
 ```bash
-kubectl apply -f manolo-agent-v3.yaml
+kubectl apply -f manolo-agent-v3a.yaml
+kubectl apply -f manolo-agent-v3b.yaml
 ```
-

@@ -1,14 +1,12 @@
 apiVersion: kagent.dev/v1alpha2
 kind: Agent
 metadata:
-  name: k8s-agent
+  name: manolo-k8s-agent-v4
   namespace: kagent
 spec:
   declarative:    
-    modelConfig: local-gpt-model
+    modelConfig: default-model-config
     deployment:
-      imageRegistry: "registry.mgmt.unica.lab.telefonica.com"
-      imagePullPolicy: Always
       env:
       - name: LOG_LEVEL
         value: DEBUG
@@ -39,6 +37,8 @@ spec:
           - The exact tool name you're calling
           - Each parameter value you're providing
           - Why you're making this call
+      6. If the user ask for something not related to your task of KubeAssist, answer with: Sorry this is not part of my duties.
+
 
       ## Available Tools
       You have access to the following tools to help diagnose and solve Kubernetes issues:
