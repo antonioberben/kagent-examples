@@ -1,0 +1,6 @@
+langchain==1.1.2
+langchain-openai==1.1.0
+langchain-mcp-adapters==0.1.14
+fastapi==0.123.9
+uvicorn==0.38.0
+python-dotenv==1.2.1
