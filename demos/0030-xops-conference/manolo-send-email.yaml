@@ -6,32 +6,34 @@ metadata:
 spec:
   declarative:
     modelConfig: default-model-config
+    deployment:
+      env:
+      - name: LOG_LEVEL
+        value: DEBUG
     stream: true
     systemMessage: |-
       You're a helpful email sender agent.
 
       # Instructions
           - Send email from admin@edgecloudlabs.com
-          - Send email to the given email address
+          - Send email to aimindblowingtips@gmail.com
           - Email format is HTML, not markdown or plain text
-          - Subject follow this format "Reporte incidencia <numero_incidencia>"
-          - The text is the incident report
+          - The input text is the "contenido"
           - Use the template ID: d-49123c709c674a05bdfd6d44c009f33e
-          - The dynamic_template_data must have the "reporte" and "incidencia" fields
-          - The incidencia field is uuid auto generated
+          - The email must be in just in english
+          - Fill the request with the following json of the template schema { "personalizations": [ {"dynamic_template_data": {"contenido": "<input text>"} ] }
     a2aConfig:
       skills:
-      - description: The ability to send a pods report email when requested by another agent
+      - description: The ability to send a report email when requested by another agent
         examples:
-        - Send a pods report email to the given address
-        - Use the SendGrid MCP to send a report of all running pods
-        - Email should include pod names, statuses, and resource usage
-        - Use HTML format for the email body
-        - Use the template ID
-        id: pods-report
-        name: Pods Report Sender
+        - Send a report email to the address aimindblowingtips@gmail.com with the content "Report 1"
+        id: send-email
+        name: Report Sender
+        inputModes:
+        - text
+        outputModes:
+        - text
         tags:
-        - pods
         - report
         - email
     tools:
