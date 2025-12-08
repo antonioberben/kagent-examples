@@ -4,11 +4,17 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy agent code
 COPY . /app
 
 # Install dependencies from requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Note socks support for requests, in case it is integrated with Istio or similar proxies
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install 'requests[socks]' --no-cache-dir
 
 # Expose the server port
 EXPOSE 10000
