@@ -14,7 +14,8 @@ COPY . /app
 # Install dependencies from requirements.txt
 # Note socks support for requests, in case it is integrated with Istio or similar proxies
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install 'requests[socks]' --no-cache-dir
+    pip install 'requests[socks]' --no-cache-dir && \
+    pip install 'httpx[socks]' --no-cache-dir
 
 # Expose the server port
 EXPOSE 10000
