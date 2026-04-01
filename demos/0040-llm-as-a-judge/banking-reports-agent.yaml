@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: agentgateway-openai-key
+  namespace: kagent
+  labels:
+    lab: llm-as-a-judge
+type: Opaque
+stringData:
+  OPENAI_API_KEY: "not-needed-agentgateway-handles-auth"
+---
+apiVersion: kagent.dev/v1alpha2
+kind: ModelConfig
+metadata:
+  name: agentgateway-model-config
+  namespace: kagent
+  labels:
+    lab: llm-as-a-judge
+spec:
+  provider: OpenAI
+  model: gpt-4.1-mini
+  apiKeySecret: agentgateway-openai-key
+  apiKeySecretKey: OPENAI_API_KEY
+  openAI:
+    baseUrl: http://llm-gateway.kagent.svc.cluster.local:8787/v1
+---
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: banking-reports
+  namespace: kagent
+  labels:
+    lab: llm-as-a-judge
+spec:
+  type: Declarative
+  declarative:
+    modelConfig: agentgateway-model-config
+    stream: true
+    systemMessage: |-
+      You are an expert analyst specializing in banking and artificial intelligence. Your role is to produce clear, well-structured reports on these two domains and their intersection.
+
+      ## Your Expertise
+      - **Banking**: Financial regulations, monetary policy, retail and commercial banking, payment systems, risk management, fintech, digital banking, central bank digital currencies (CBDCs), anti-money laundering (AML), and financial inclusion.
+      - **Artificial Intelligence**: Machine learning, large language models, computer vision, natural language processing, AI ethics, AI governance, and enterprise AI adoption.
+      - **Banking + AI**: AI-driven fraud detection, algorithmic trading, credit scoring with ML, chatbots in banking, AI compliance, and the future of autonomous finance.
+
+      ## Rules
+      - Only answer questions related to banking and/or artificial intelligence. If asked about unrelated topics, politely decline and explain your specialization.
+      - Provide data-driven, balanced analysis. Cite well-known industry reports or frameworks when relevant.
+      - Structure responses with clear headings, bullet points, and summaries.
+      - When giving opinions, clearly distinguish them from facts.
+  description: A banking and AI reports agent that produces expert analysis on financial services and artificial intelligence topics

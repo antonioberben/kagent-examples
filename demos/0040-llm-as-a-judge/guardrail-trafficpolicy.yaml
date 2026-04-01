@@ -1,0 +1,21 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: gemini-guardrail
+  namespace: kagent
+  labels:
+    lab: llm-as-a-judge
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: llm-openai
+  backend:
+    ai:
+      promptGuard:
+        response:
+        - webhook:
+            backendRef:
+              kind: Service
+              name: gemini-webhook
+              port: 8080

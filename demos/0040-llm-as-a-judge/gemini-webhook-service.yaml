@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gemini-webhook-code
+  namespace: kagent
+  labels:
+    lab: llm-as-a-judge
+data:
+  main.py: |
+    import json
+    import os
+    import sys
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+
+    from google import genai
+
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+    client = genai.Client(api_key=GEMINI_API_KEY)
+
+    JUDGE_PROMPT = """You are an accuracy evaluator. Score the following LLM response on these criteria (1-5 each):
+
+    1. **Accuracy**: Are the facts correct and verifiable?
+    2. **Relevance**: Is the response relevant to banking and/or AI topics?
+    3. **Clarity**: Is the response well-structured, clear, and easy to understand?
+
+    Respond ONLY with valid JSON in this exact format:
+    {
+      "overall_score": <sum of all scores, max 15>,
+      "criteria": {
+        "accuracy": {"score": <1-5>, "reason": "<brief reason>"},
+        "relevance": {"score": <1-5>, "reason": "<brief reason>"},
+        "clarity": {"score": <1-5>, "reason": "<brief reason>"}
+      },
+      "summary": "<one sentence summary of the evaluation>"
+    }"""
+
+    class WebhookHandler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length).decode("utf-8")
+
+            reason = "evaluation skipped"
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=f"{JUDGE_PROMPT}\n\nResponse to evaluate:\n\n{body}",
+                    config={
+                        "response_mime_type": "application/json",
+                        "temperature": 0.1,
+                    },
+                )
+
+                evaluation = json.loads(response.text)
+                score = evaluation.get("overall_score", "N/A")
+                summary = evaluation.get("summary", "No summary")
+                reason = f"Score: {score}/15 - {summary}"
+
+                print(f"[gemini-judge] Score: {score}/15 | {summary}", flush=True)
+                print(f"[gemini-judge] Details: {json.dumps(evaluation, indent=2)}", flush=True)
+
+            except Exception as e:
+                reason = f"evaluation error: {e}"
+                print(f"[gemini-judge] Error during evaluation: {e}", flush=True)
+
+            # Always return 200 with PassAction — never block the response
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"action": {"reason": reason}}).encode())
+
+        def log_message(self, format, *args):
+            print(f"[gemini-webhook] {args[0]}", flush=True)
+
+    if __name__ == "__main__":
+        port = int(os.environ.get("PORT", "8080"))
+        server = HTTPServer(("0.0.0.0", port), WebhookHandler)
+        print(f"Gemini webhook listening on port {port}", flush=True)
+        sys.stdout.flush()
+        server.serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemini-webhook
+  namespace: kagent
+  labels:
+    app: gemini-webhook
+    lab: llm-as-a-judge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gemini-webhook
+  template:
+    metadata:
+      labels:
+        app: gemini-webhook
+    spec:
+      containers:
+      - name: gemini-judge
+        image: python:3.12-slim
+        command: ["sh", "-c", "pip install google-genai && python /app/main.py"]
+        ports:
+        - containerPort: 8080
+        env:
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: gemini-api-key
+              key: GEMINI_API_KEY
+        - name: PORT
+          value: "8080"
+        volumeMounts:
+        - name: code
+          mountPath: /app
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+      volumes:
+      - name: code
+        configMap:
+          name: gemini-webhook-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gemini-webhook
+  namespace: kagent
+  labels:
+    app: gemini-webhook
+    lab: llm-as-a-judge
+spec:
+  selector:
+    app: gemini-webhook
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
