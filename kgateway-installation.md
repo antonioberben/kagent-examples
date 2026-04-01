@@ -25,14 +25,12 @@ helm upgrade -i kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway
     --set controller.image.pullPolicy=Always
 ```
 
-Install kgateway with AgentGateway enabled
+Install kgateway
 
 ```bash
 helm upgrade -i kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway \
     --namespace kgateway-system \
     --create-namespace \
     --version $KGATEWAY_VERSION \
-    --set controller.image.pullPolicy=Always \
-    --set agentGateway.enabled=true \
-    --set agentGateway.enableAlphaAPIs=true
+    --set controller.image.pullPolicy=Always
 ```

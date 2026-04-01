@@ -1,3 +1,7 @@
 fastmcp==2.12.5
 fastapi[all]==0.119.1
 requests==2.32.5
+opentelemetry-distro==0.57b0
+opentelemetry-exporter-otlp-proto-grpc==1.36.0
+opentelemetry-instrumentation-fastapi==0.57b0
+opentelemetry-instrumentation-requests==0.57b0

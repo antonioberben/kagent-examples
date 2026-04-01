@@ -25,6 +25,8 @@ The MCP server exposes its tools over HTTP (by default on port 8080). MCP client
 	pip install -r requirements.txt
 	```
 
+	This installs the OpenTelemetry launcher binary (`opentelemetry-instrument`) that kagent injects when tracing is enabled.
+
 3. Set the required environment variable:
 	```bash
 	export HTTPBIN_HOST="https://httpbin.org"
@@ -33,6 +35,11 @@ The MCP server exposes its tools over HTTP (by default on port 8080). MCP client
 4. Start the MCP server (HTTP transport, port 8080):
 	```bash
 	python main.py
+	```
+
+	To validate the same startup path that kagent uses, run:
+	```bash
+	opentelemetry-instrument python main.py
 	```
 
 The server will expose its MCP tools at `http://localhost:8080/mcp`. You can use any MCP-capable client to invoke the `httpbin_get` tool.
@@ -58,6 +65,17 @@ HTTPBIN_HOST="https://httpbin.org" python main.py
 	```bash
 	docker run --rm -e HTTPBIN_HOST="https://httpbin.org" -p 8080:8080 ${MY_REPO_NAME}/httpbin-mcp-server:latest
 	```
+
+3. Verify the image contains the OpenTelemetry launcher and can start under the injected wrapper:
+	```bash
+	docker run --rm \
+	  -e HTTPBIN_HOST="https://httpbin.org" \
+	  -p 8080:8080 \
+	  ${MY_REPO_NAME}/httpbin-mcp-server:latest \
+	  sh -lc 'command -v opentelemetry-instrument && opentelemetry-instrument python main.py'
+	```
+
+	If kagent tracing is enabled, this is the execution path the controller will use for the container entrypoint.
 
 ## Example MCP Tool Invocation
 
