@@ -1,6 +1,6 @@
 # LLM as a Judge: Evaluating AI Responses with Gemini via AgentGateway Guardrails
 
-This lab demonstrates the **LLM-as-a-Judge** pattern using AgentGateway's guardrails webhook. A banking and AI reports agent generates responses, and a Gemini-powered webhook automatically evaluates every response for accuracy — all at the gateway level, with zero changes to the agent itself.
+This lab demonstrates the **LLM-as-a-Judge** pattern using CNCF's Open Source projects like AgentGateway's guardrails webhook. A banking and AI reports agent generates responses, and a Gemini-powered webhook automatically evaluates every response for accuracy — all at the gateway level, with zero changes to the agent itself.
 
 ## What You Will Learn
 
@@ -10,6 +10,10 @@ This lab demonstrates the **LLM-as-a-Judge** pattern using AgentGateway's guardr
 - How an external LLM (Gemini) can score responses produced by another LLM (OpenAI)
 
 ## Architecture
+
+This is the architecture of the lab:
+
+![Architecture Diagram](./images/image.png)
 
 ```text
 User → Kagent UI → Banking Reports Agent
