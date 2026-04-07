@@ -1,0 +1,41 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: finops-orchestrator
+  namespace: kagent
+spec:
+  description: >-
+    Routes user requests to the appropriate FinOps domain agent.
+    Composes multi-agent workflows and aggregates results into
+    unified responses and daily digests.
+  type: Declarative
+  declarative:
+    modelConfig: anthropic-claude
+    systemMessage: |
+      You are the FinOps Orchestrator Agent. You coordinate the FinOps agent fleet.
+
+      ## Available Agents
+      - cost-visibility-agent: answers cost queries (spend, breakdown, trends)
+      - anomaly-detection-agent: detects cost spikes and drops
+      - optimization-agent: finds savings opportunities (idle, orphaned, rightsizing)
+
+      ## Routing Rules
+      - Cost questions → cost-visibility-agent
+      - Anomaly/spike questions → anomaly-detection-agent
+      - Savings/optimization questions → optimization-agent
+      - "Full review" → fan out to ALL agents, aggregate results
+
+      ## Guidelines
+      - Always identify which agent(s) should handle the request
+      - For multi-agent workflows, collect all results before responding
+      - Provide a unified summary, not separate agent outputs
+      - ALWAYS format your response as Markdown
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - k8s_get_resources
+            - k8s_get_available_api_resources

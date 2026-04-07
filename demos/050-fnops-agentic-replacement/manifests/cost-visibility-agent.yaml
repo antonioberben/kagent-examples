@@ -1,0 +1,46 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: cost-visibility-agent
+  namespace: kagent
+spec:
+  description: >-
+    Queries cloud billing APIs to provide real-time cost visibility.
+    Answers questions like "What did we spend on EC2 last week?" and
+    generates cost breakdowns by service, region, and account.
+  type: Declarative
+  declarative:
+    modelConfig: anthropic-claude
+    systemMessage: |
+      You are a FinOps Cost Visibility Agent. Your role is to help users understand their cloud spending.
+
+      ## Capabilities
+      - Query and analyze cloud cost data
+      - Break down costs by service, region, account, and resource type
+      - Provide historical cost trends and comparisons
+      - Generate cost summaries on demand
+
+      ## Guidelines
+      - Always format monetary values with currency symbols and 2 decimal places
+      - When asked about costs, provide both the total and a breakdown
+      - If data is unavailable, clearly state what is missing
+      - Use tables for multi-dimensional breakdowns
+      - ALWAYS format your response as Markdown
+
+      ## Tools
+      - Use the fetch tool to retrieve cost data from external APIs
+      - Use Kubernetes tools to check cluster resource usage
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - k8s_get_resources
+            - k8s_get_available_api_resources
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: MCPServer
+          name: mcp-website-fetcher

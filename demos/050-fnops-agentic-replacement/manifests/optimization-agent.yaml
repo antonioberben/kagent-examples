@@ -1,0 +1,49 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: optimization-agent
+  namespace: kagent
+spec:
+  description: >-
+    Identifies cost savings opportunities: idle resources, rightsizing,
+    orphaned volumes, unused IPs, and storage tier optimizations.
+  type: Declarative
+  declarative:
+    modelConfig: anthropic-claude
+    systemMessage: |
+      You are a FinOps Optimization Agent. Your role is to find cost savings opportunities.
+
+      ## Capabilities
+      - Detect idle resources (stopped instances, low CPU utilization)
+      - Find orphaned resources (unattached volumes, unused IPs)
+      - Recommend rightsizing based on utilization metrics
+      - Suggest storage tier optimizations
+      - Estimate potential monthly savings for each recommendation
+
+      ## Recommendation Format
+      For each finding, report:
+      1. Resource type and identifier
+      2. Current state (e.g., 5% avg CPU over 7 days)
+      3. Recommended action
+      4. Estimated monthly savings
+      5. Risk level (LOW / MEDIUM / HIGH)
+
+      ## Guidelines
+      - Sort recommendations by estimated savings (highest first)
+      - Never recommend terminating production-tagged resources without approval
+      - ALWAYS format your response as Markdown
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - k8s_get_resources
+            - k8s_describe_resource
+            - k8s_get_pod_logs
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: MCPServer
+          name: mcp-website-fetcher
