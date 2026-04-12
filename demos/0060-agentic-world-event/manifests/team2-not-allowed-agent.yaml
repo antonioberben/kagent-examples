@@ -1,0 +1,104 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: team2-not-allowed
+  namespace: kagent
+  labels:
+    team: team2
+    authorized: "false"
+    event: agentic-world
+spec:
+  description: Team2 agent for Agentic World Event - NOT authorized (will be denied by policy)
+  type: Declarative
+  declarative:
+    modelConfig: default-model-config
+    stream: true
+    systemMessage: |
+
+      You are the Team2 AI Agent for the Agentic World Event. You are a powerful orchestrator
+      agent that specializes in Kubernetes, Istio, Gateway API, and Helm operations.
+
+      You have access to specialized community agents through A2A (agent-to-agent) communication:
+      - k8s-agent: For Kubernetes cluster operations (pods, deployments, services, etc.)
+      - istio-agent: For Istio service mesh management (VirtualServices, DestinationRules, etc.)
+      - kgateway-agent: For Kubernetes Gateway API management
+      - helm-agent: For Helm release management (install, upgrade, list, rollback)
+
+      When a user asks you to perform operations, delegate to the appropriate specialized agent.
+      Be helpful, clear, and professional. Always explain what you're doing and which agent
+      you're delegating to.
+
+      Example interactions:
+        - "Check the version of istio used in the cluster, and the helm installations. Then, deploy a new nginx deployment in a new namespace called nginx and make it part of the ambient mesh"
+
+
+      Handle errors gracefully and provide useful feedback to the user. If an agent is unavailable, inform the user and suggest contacting the Admin.
+
+    a2aConfig:
+      skills:
+        - id: team2-k8s-ops
+          name: Team2 Kubernetes Operations (Unauthorized)
+          description: Attempt Kubernetes operations (will be denied by policy)
+          tags:
+            - kubernetes
+            - k8s
+            - team2
+            - unauthorized
+          examples:
+            - "Try to list all deployments"
+            - "Attempt to get pod logs"
+
+        - id: team2-istio-ops
+          name: Team2 Istio Operations (Unauthorized)
+          description: Attempt Istio operations (will be denied by policy)
+          tags:
+            - istio
+            - service-mesh
+            - team2
+            - unauthorized
+          examples:
+            - "Try to show VirtualServices"
+
+    tools:
+      # A2A connections to community agents (will be blocked by policy)
+      - type: Agent
+        agent:
+          apiGroup: kagent.dev
+          kind: Agent
+          name: k8s-agent
+          namespace: kagent
+
+      - type: Agent
+        agent:
+          apiGroup: kagent.dev
+          kind: Agent
+          name: istio-agent
+          namespace: kagent
+
+      - type: Agent
+        agent:
+          apiGroup: kagent.dev
+          kind: Agent
+          name: kgateway-agent
+          namespace: kagent
+
+      - type: Agent
+        agent:
+          apiGroup: kagent.dev
+          kind: Agent
+          name: helm-agent
+          namespace: kagent
+
+    deployment:
+      labels:
+        istio.io/use-waypoint: kagent-waypoint
+      env:
+        - name: AGENT_IDENTITY
+          value: "team2-not-allowed"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi

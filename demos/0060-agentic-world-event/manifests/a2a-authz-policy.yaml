@@ -1,0 +1,119 @@
+# Enterprise Agentgateway Policies for A2A Authorization
+# Demonstrates policy-based access control: team1 ALLOWED, team2 DENIED
+
+# Policy 1: ALLOW team1 to access k8s-agent
+# Default allow for all k8s-agent requests (deny policy below blocks team2)
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: allow-team1-to-k8s-agent
+  namespace: kagent
+  labels:
+    policy-type: authz
+    event: agentic-world
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: kagent-a2a-route
+
+  traffic:
+    authorization:
+      action: Allow
+      policy:
+        matchExpressions:
+          # Allow all k8s-agent requests (team2 will be explicitly denied below)
+          - 'request.path.contains("/api/a2a/kagent/k8s-agent")'
+---
+# Policy 2: DENY team2-not-allowed from accessing k8s-agent
+# Uses source workload label-based matching
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: deny-team2-from-k8s-agent
+  namespace: kagent
+  labels:
+    policy-type: authz
+    event: agentic-world
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: kagent-a2a-route
+
+  traffic:
+    authorization:
+      action: Deny
+      policy:
+        matchExpressions:
+          # Deny requests to k8s-agent from source with team2 label
+          - 'source.labels["app.kubernetes.io/name"] == "team2-not-allowed" && request.path.contains("/api/a2a/kagent/k8s-agent")'
+---
+# Policy 3: ALLOW team1 to access istio-agent
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: allow-team1-to-istio-agent
+  namespace: kagent
+  labels:
+    policy-type: authz
+    event: agentic-world
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: kagent-a2a-route
+
+  traffic:
+    authorization:
+      action: Allow
+      policy:
+        matchExpressions:
+          # Match: team1 service account calling istio-agent
+          - 'request.auth.principal.endsWith("/sa/team1") && request.path.contains("/api/a2a/kagent/istio-agent")'
+---
+# Policy 4: ALLOW team1 to access helm-agent
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: allow-team1-to-helm-agent
+  namespace: kagent
+  labels:
+    policy-type: authz
+    event: agentic-world
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: kagent-a2a-route
+
+  traffic:
+    authorization:
+      action: Allow
+      policy:
+        matchExpressions:
+          # Match: team1 service account calling helm-agent
+          - 'request.auth.principal.endsWith("/sa/team1") && request.path.contains("/api/a2a/kagent/helm-agent")'
+---
+# Policy 5: ALLOW team1 to access kgateway-agent
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: allow-team1-to-kgateway-agent
+  namespace: kagent
+  labels:
+    policy-type: authz
+    event: agentic-world
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: kagent-a2a-route
+
+  traffic:
+    authorization:
+      action: Allow
+      policy:
+        matchExpressions:
+          # Match: team1 service account calling kgateway-agent
+          - 'request.auth.principal.endsWith("/sa/team1") && request.path.contains("/api/a2a/kagent/kgateway-agent")'
