@@ -1,0 +1,118 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: team1
+  namespace: kagent
+  labels:
+    team: team1
+    authorized: "true"
+    event: agentic-world
+spec:
+  description: Team1 agent for Agentic World Event - authorized to access community agents via A2A
+  type: Declarative
+  declarative:
+    modelConfig: default-model-config
+    stream: true
+    systemMessage: |
+
+      You are the Team1 AI Agent for the Agentic World Event. You are a powerful orchestrator
+      agent that specializes in Kubernetes, Istio, Gateway API, and Helm operations.
+      For the prompts, use the different agents that you have access to: Istio, Kubernetes and Helm agents.
+
+      You have access to specialized community agents through A2A (agent-to-agent) communication:
+      - k8s-agent: For Kubernetes cluster operations (pods, deployments, services, etc.)
+      - istio-agent: For Istio service mesh management (VirtualServices, DestinationRules, etc.)
+      - kgateway-agent: For Kubernetes Gateway API management
+      - helm-agent: For Helm release management (install, upgrade, list, rollback)
+
+      When a user asks you to perform operations, delegate to the appropriate specialized agent.
+      Be helpful, clear, and professional. Always explain what you're doing and which agent
+      you're delegating to.
+
+      Example interactions:
+      - "List all pods" → delegate to k8s-agent
+      - "Check the version of istio used in the cluster, and the helm installations. Then, deploy a new nginx deployment in a new namespace called nginx and make it part of the ambient mesh"
+
+
+      Handle errors gracefully and provide useful feedback to the user. If an agent is unavailable, inform the user and suggest trying again later.
+      If the error is 403 Forbidden, it means you don't have permission to access that agent. Inform the user that you are not authorized to perform that action and to contact the admin to give you permissions.
+
+    a2aConfig:
+      skills:
+        - id: team1-k8s-ops
+          name: Team1 Kubernetes Operations
+          description: Perform Kubernetes operations on behalf of Team1 (authorized)
+          tags:
+            - kubernetes
+            - k8s
+            - team1
+            - authorized
+          examples:
+            - "List all deployments in the default namespace"
+            - "Check the version of istio used in the cluster, and the helm installations. Then, deploy a new nginx deployment in a new namespace called nginx and make it part of the ambient mesh"
+
+        - id: team1-istio-ops
+          name: Team1 Istio Operations
+          description: Perform Istio service mesh operations on behalf of Team1 (authorized)
+          tags:
+            - istio
+            - service-mesh
+            - team1
+            - authorized
+          examples:
+            - "Check the version of istio used in the cluster, and the helm installations. Then, deploy a new nginx deployment in a new namespace called nginx and make it part of the ambient mesh"
+
+
+        - id: team1-helm-ops
+          name: Team1 Helm Operations
+          description: Perform Helm release management on behalf of Team1 (authorized)
+          tags:
+            - helm
+            - releases
+            - team1
+            - authorized
+          examples:
+            - "Check the version of istio used in the cluster, and the helm installations. Then, deploy a new nginx deployment in a new namespace called nginx and make it part of the ambient mesh"
+
+
+    tools:
+      # A2A connections to community agents
+      - type: Agent
+        agent:
+          apiGroup: kagent.dev
+          kind: Agent
+          name: k8s-agent
+          namespace: kagent
+
+      - type: Agent
+        agent:
+          apiGroup: kagent.dev
+          kind: Agent
+          name: istio-agent
+          namespace: kagent
+
+      - type: Agent
+        agent:
+          apiGroup: kagent.dev
+          kind: Agent
+          name: kgateway-agent
+          namespace: kagent
+
+      - type: Agent
+        agent:
+          apiGroup: kagent.dev
+          kind: Agent
+          name: helm-agent
+          namespace: kagent
+
+    deployment:
+      labels:
+        istio.io/use-waypoint: kagent-waypoint
+      # Agent env vars come LAST to override controller's auto-injected KAGENT_URL
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 2000m
+          memory: 2Gi
