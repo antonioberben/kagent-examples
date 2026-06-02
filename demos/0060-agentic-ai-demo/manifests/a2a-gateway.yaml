@@ -4,7 +4,7 @@ metadata:
   name: kagent-a2a-gateway
   namespace: kagent
   labels:
-    event: agentic-world
+    event: agentic-ai-kagent
 spec:
   gatewayClassName: enterprise-agentgateway
   listeners:
@@ -21,7 +21,7 @@ metadata:
   name: kagent-a2a-route
   namespace: kagent
   labels:
-    event: agentic-world
+    event: agentic-ai-kagent
 spec:
   parentRefs:
     - name: kagent-a2a-gateway
