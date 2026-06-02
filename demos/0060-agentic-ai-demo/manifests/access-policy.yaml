@@ -1,0 +1,42 @@
+# AccessPolicy — kagent-enterprise native authorization for A2A.
+# The controller translates each AccessPolicy into an EnterpriseAgentgatewayPolicy
+# enforced by the agentgateway waypoint that fronts the target Agent.
+# The target Agent must carry the label kagent.solo.io/waypoint: "true".
+
+# ALLOW team1 -> k8s-agent
+apiVersion: policy.kagent-enterprise.solo.io/v1alpha1
+kind: AccessPolicy
+metadata:
+  name: allow-team1-to-k8s-agent
+  namespace: kagent
+  labels:
+    event: agentic-ai-kagent
+spec:
+  from:
+    subjects:
+    - kind: Agent
+      name: team1
+      namespace: kagent
+  targetRef:
+    kind: Agent
+    name: k8s-agent
+  action: ALLOW
+---
+# DENY team2-not-allowed -> k8s-agent
+apiVersion: policy.kagent-enterprise.solo.io/v1alpha1
+kind: AccessPolicy
+metadata:
+  name: deny-team2-to-k8s-agent
+  namespace: kagent
+  labels:
+    event: agentic-ai-kagent
+spec:
+  from:
+    subjects:
+    - kind: Agent
+      name: team2-not-allowed
+      namespace: kagent
+  targetRef:
+    kind: Agent
+    name: k8s-agent
+  action: DENY

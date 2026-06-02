@@ -6,16 +6,16 @@ metadata:
   labels:
     team: team2
     authorized: "false"
-    event: agentic-world
+    event: agentic-ai-kagent
 spec:
-  description: Team2 agent for Agentic World Event - NOT authorized (will be denied by policy)
+  description: Team2 agent for Agentic AI Kagent - NOT authorized (will be denied by policy)
   type: Declarative
   declarative:
     modelConfig: default-model-config
-    stream: true
+    stream: false
     systemMessage: |
 
-      You are the Team2 AI Agent for the Agentic World Event. You are a powerful orchestrator
+      You are the Team2 AI Agent for the Agentic AI Kagent. You are a powerful orchestrator
       agent that specializes in Kubernetes, Istio, Gateway API, and Helm operations.
 
       You have access to specialized community agents through A2A (agent-to-agent) communication:
@@ -27,6 +27,13 @@ spec:
       When a user asks you to perform operations, delegate to the appropriate specialized agent.
       Be helpful, clear, and professional. Always explain what you're doing and which agent
       you're delegating to.
+
+      AUTONOMOUS EXECUTION: When a user asks you to perform a multi-step task, execute every
+      step yourself by delegating to the right agent. DO NOT ask the user for confirmation
+      before each step (e.g. "Would you like me to proceed?", "Should I create the namespace?").
+      Assume the user wants the full task completed and only stop to ask the user a question
+      if a step actually fails or returns ambiguous information that requires a human decision.
+      Report what was done at the end, not before.
 
       Example interactions:
         - "Check the version of istio used in the cluster, and the helm installations. Then, deploy a new nginx deployment in a new namespace called nginx and make it part of the ambient mesh"
@@ -90,8 +97,6 @@ spec:
           namespace: kagent
 
     deployment:
-      labels:
-        istio.io/use-waypoint: kagent-waypoint
       env:
         - name: AGENT_IDENTITY
           value: "team2-not-allowed"

@@ -1,6 +1,6 @@
-# Agentic World Event - Kagent Enterprise Lab
+# Agentic AI Kagent - Kagent Enterprise Lab
 
-This lab demonstrates enterprise-grade policy-based access control for AI agents using Solo's enterprise products. Two custom agents (team1, team2-not-allowed) have identical configuration, but team2 is blocked from accessing k8s-agent by an Istio AuthorizationPolicy enforced at the waypoint proxy.
+This lab demonstrates enterprise-grade policy-based access control for AI agents using Solo's enterprise products. Two custom agents (team1, team2-not-allowed) have identical configuration, but team2 is blocked from accessing k8s-agent by an **AccessPolicy**, the native kagent-enterprise authorization resource, enforced at the agent's agentgateway waypoint.
 
 ## Demo Scenario
 
@@ -20,35 +20,38 @@ Both agents have the same tools, same system prompt structure, same model. The o
                    |                 |
                  team1         team2-not-allowed
                    |                 |
-                   |    A2A (direct pod-to-pod)
-                   |                 |
-              kagent-waypoint (L7 proxy)
-              [AuthorizationPolicy]
+                   |   A2A call to k8s-agent
                    |                 |
                    v                 v
-              k8s-agent         k8s-agent
-              200 OK            403 Forbidden
+          agent-k8s-agent-waypoint (agentgateway, L7)
+          [AccessPolicy -> EnterpriseAgentgatewayPolicy]
+                   |                 |
+                 ALLOW             DENY
+                   |                 |
+                   v                 v
+               k8s-agent           403 Forbidden
+               200 OK
 ```
 
 **Enforcement chain:**
-1. `istio-base` Helm chart -> provides AuthorizationPolicy CRD
-2. `istio.io/dataplane-mode=ambient` on namespace -> enrolls pods in mesh with mTLS identity
-3. `istio.io/use-waypoint=kagent-waypoint` on k8s-agent service -> routes traffic through L7 waypoint
-4. `AuthorizationPolicy` targeting waypoint -> DENY rule matching team2's SPIFFE identity
+1. `kagent-enterprise` -> provides the `AccessPolicy` CRD and the controller that translates it.
+2. `istio.io/dataplane-mode=ambient` on the namespace -> enrolls pods in the mesh with mTLS (SPIFFE) identity.
+3. `kagent.solo.io/waypoint=true` on the target Agent (`k8s-agent`) -> the controller provisions an agentgateway waypoint in front of it (`agent-k8s-agent-waypoint`) and repoints the service's `istio.io/use-waypoint` label automatically.
+4. `AccessPolicy` (subject = Agent, target = Agent, action ALLOW/DENY) -> the controller generates an `EnterpriseAgentgatewayPolicy` on the agent's HTTPRoute. The waypoint enforces it by matching the caller's SPIFFE identity.
 
 ## Components
 
 | Component | Purpose |
 |-----------|---------|
-| Solo Enterprise for Istio (ambient) | Zero-trust mTLS, ztunnel, waypoint proxy for L7 policy |
-| Solo Enterprise for Agentgateway | Gateway + HTTPRoute for A2A, EnterpriseAgentgatewayPolicy |
-| Solo Enterprise for Kagent | Agent runtime, controller, 10 community agents |
+| Solo Enterprise for Istio (ambient) | Zero-trust mTLS, ztunnel, SPIFFE identity per pod |
+| Solo Enterprise for Agentgateway | Per-agent agentgateway waypoint that enforces AccessPolicy, plus the A2A data-path gateway |
+| Solo Enterprise for Kagent | Agent runtime, controller (AccessPolicy translation), community agents, UI |
 | AgentRegistry | Centralized agent/skill/MCP discovery with pgvector |
 | Management UI | Solo Enterprise UI with OIDC auto provider, ClickHouse telemetry |
 
-### Community Agents (10)
+### Community Agents
 
-k8s-agent, istio-agent, kgateway-agent, helm-agent, observability-agent, promql-agent, argo-rollouts-agent, cilium-policy-agent, cilium-manager-agent, cilium-debug-agent
+k8s-agent, istio-agent, kgateway-agent, helm-agent, promql-agent, argo-rollouts-agent, cilium-policy-agent, cilium-manager-agent, cilium-debug-agent (observability-agent is disabled in this lab).
 
 ### Custom Agents (2)
 
@@ -57,17 +60,29 @@ k8s-agent, istio-agent, kgateway-agent, helm-agent, observability-agent, promql-
 
 ## Prerequisites
 
-1. Kind cluster with context `agentic-world`
+1. Kind cluster with context `$KUBE_CONTEXT` and kubectl configured
 2. `kubectl`, `helm` (v3.12+), `openssl`
 3. Environment variables in `.env`:
 
 ```bash
-export KUBE_CONTEXT=agentic-world
+export KUBE_CONTEXT=<your-kube-context>
 export OPENAI_API_KEY=<your-openai-key>
 export SOLO_ISTIO_LICENSE_KEY=<license>
 export GLOO_GATEWAY_LICENSE_KEY=<license>
 export AGENTGATEWAY_LICENSE_KEY=<license>
 ```
+
+## Quick start
+
+The whole lab is scripted. From this directory:
+
+```bash
+./deploy.sh    # install everything end-to-end
+./test.sh      # verify policy enforcement (team1 200, team2 403)
+./cleanup.sh   # tear down in reverse order
+```
+
+The sections below document the same flow step by step for reference. Pinned versions live in `.env` (Istio `1.30.0-solo`, enterprise-agentgateway `v2026.5.2`, kagent-enterprise `0.4.4`, agentregistry `0.3.3`, Gateway API `v1.2.1`).
 
 ## Installation
 
@@ -101,7 +116,6 @@ kubectl create secret generic llm-api-keys \
 Required by both Istio waypoint gateways and enterprise-agentgateway.
 
 ```bash
-GATEWAY_API_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/gateway-api/releases/latest | grep tag_name | cut -d '"' -f 4)
 kubectl apply -f \
   https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml \
   --context $KUBE_CONTEXT
@@ -109,26 +123,21 @@ kubectl apply -f \
 
 ### Step 5: Install Istio Ambient Mesh (Solo Distribution)
 
-Istio ambient mesh provides mTLS identity (SPIFFE) for every pod, which is how the authorization policy identifies team1 vs team2.
+Istio ambient mesh provides mTLS identity (SPIFFE) for every pod, which is how the AccessPolicy identifies team1 vs team2.
 
 ```bash
-export ISTIO_VERSION=1.29.1
-export ISTIO_IMAGE=${ISTIO_VERSION}-solo
-export REPO=us-docker.pkg.dev/soloio-img/istio
-export HELM_REPO=us-docker.pkg.dev/soloio-img/istio-helm
-
 cat > /tmp/istio-values.yaml <<EOF
 global:
-  hub: ${REPO}
-  tag: ${ISTIO_IMAGE}
+  hub: ${ISTIO_REPO}
+  tag: ${ISTIO_IMAGE_TAG}
 profile: ambient
 EOF
 ```
 
-**5a. Install Istio base CRDs** - This provides the `AuthorizationPolicy` CRD. Without this chart, the policy cannot be created.
+**5a. Install Istio base CRDs**
 
 ```bash
-helm install istio-base istio/base \
+helm upgrade --install istio-base oci://${ISTIO_HELM_REPO}/base \
   --namespace istio-system \
   --version ${ISTIO_VERSION} \
   --kube-context $KUBE_CONTEXT
@@ -137,7 +146,7 @@ helm install istio-base istio/base \
 **5b. Install istiod (control plane)**
 
 ```bash
-helm upgrade --install istiod-solo oci://${HELM_REPO}/istiod \
+helm upgrade --install istiod-solo oci://${ISTIO_HELM_REPO}/istiod \
   --version ${ISTIO_VERSION} \
   --namespace istio-system \
   --kube-context $KUBE_CONTEXT \
@@ -147,7 +156,7 @@ helm upgrade --install istiod-solo oci://${HELM_REPO}/istiod \
 **5c. Install Istio CNI**
 
 ```bash
-helm upgrade --install istio-cni oci://${HELM_REPO}/cni \
+helm upgrade --install istio-cni oci://${ISTIO_HELM_REPO}/cni \
   --version ${ISTIO_VERSION} \
   --namespace istio-system \
   --kube-context $KUBE_CONTEXT \
@@ -157,7 +166,7 @@ helm upgrade --install istio-cni oci://${HELM_REPO}/cni \
 **5d. Install ztunnel** - The per-node proxy that encrypts all pod traffic with mTLS.
 
 ```bash
-helm upgrade --install ztunnel oci://${HELM_REPO}/ztunnel \
+helm upgrade --install ztunnel oci://${ISTIO_HELM_REPO}/ztunnel \
   --version ${ISTIO_VERSION} \
   --namespace istio-system \
   --kube-context $KUBE_CONTEXT \
@@ -176,41 +185,41 @@ kubectl label namespace kagent istio.io/dataplane-mode=ambient --context $KUBE_C
 
 ### Step 6: Install Agentgateway Enterprise
 
-Provides the `EnterpriseAgentgatewayPolicy` CRD and the gateway proxy for A2A traffic routing.
+Provides the agentgateway waypoint that fronts each policy-protected agent and enforces the generated `EnterpriseAgentgatewayPolicy`.
 
 ```bash
 helm upgrade -i --create-namespace \
   --namespace agentgateway-system \
-  --version v2.2.0 \
+  --version ${AGENTGATEWAY_VERSION} \
   enterprise-agentgateway-crds \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds \
   --kube-context $KUBE_CONTEXT
 
 helm upgrade -i -n agentgateway-system enterprise-agentgateway \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
-  --version v2.2.0 \
+  --version ${AGENTGATEWAY_VERSION} \
   --kube-context $KUBE_CONTEXT \
   --set-string licensing.licenseKey=${AGENTGATEWAY_LICENSE_KEY}
 ```
 
 ### Step 7: Install Kagent Enterprise
 
-Deploys the kagent controller, 10 community agents, and the UI.
+Deploys the kagent controller, the community agents, and the UI.
 
-- `manifests/kagent-enterprise-values.yaml` - Enables all 10 community agents with resource limits, OIDC auto provider, OTel tracing to telemetry-collector, and `controller.a2aBaseUrl` pointing to the gateway.
+- `manifests/kagent-enterprise-values.yaml` - Enables the community agents with resource limits, OIDC auto provider, OTel tracing to telemetry-collector, and `controller.a2aBaseUrl` pointing to the A2A gateway.
 
 ```bash
 helm upgrade --install kagent-crds \
   oci://us-docker.pkg.dev/solo-public/kagent-enterprise-helm/charts/kagent-enterprise-crds \
   --namespace kagent \
   --kube-context $KUBE_CONTEXT \
-  --version 0.3.14
+  --version ${KAGENT_ENT_VERSION}
 
 helm upgrade --install kagent \
   oci://us-docker.pkg.dev/solo-public/kagent-enterprise-helm/charts/kagent-enterprise \
   --namespace kagent \
   --kube-context $KUBE_CONTEXT \
-  --version 0.3.14 \
+  --version ${KAGENT_ENT_VERSION} \
   --values manifests/kagent-enterprise-values.yaml \
   --set licensing.licenseKey=$GLOO_GATEWAY_LICENSE_KEY
 ```
@@ -226,7 +235,7 @@ helm upgrade -i kagent-mgmt \
   oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
   --namespace kagent \
   --kube-context $KUBE_CONTEXT \
-  --version 0.3.14 \
+  --version ${KAGENT_ENT_VERSION} \
   --values manifests/management-values.yaml \
   --set licensing.licenseKey=$GLOO_GATEWAY_LICENSE_KEY
 ```
@@ -254,7 +263,7 @@ helm upgrade --install agentregistry \
   --namespace agentregistry \
   --create-namespace \
   --kube-context $KUBE_CONTEXT \
-  --version 0.3.3 \
+  --version ${AGENTREGISTRY_VERSION} \
   --set config.jwtPrivateKey="$AGENT_REGISTRY_JWT" \
   --set database.postgres.bundled.enabled=false \
   --set-string database.postgres.url="postgres://agentregistry:agentregistry@postgres-pgvector.agentregistry.svc.cluster.local:5432/agent-registry?sslmode=disable" \
@@ -290,67 +299,60 @@ arctl deployments create user/my-mcp-server \
  --version 0.1.0
 ```
 
-### Step 10: Deploy Istio Waypoint Gateway
+### Step 10: Deploy the A2A Gateway
 
-The waypoint proxy is the L7 enforcement point. Traffic to services labeled with `istio.io/use-waypoint=kagent-waypoint` is routed through this proxy, where AuthorizationPolicy rules are evaluated.
+The A2A gateway is the data path the controller uses to proxy agent-to-agent calls (`controller.a2aBaseUrl` in the kagent values points to it). It does not enforce policy; enforcement happens at the per-agent waypoint provisioned in Step 12.
 
-- `manifests/kagent-waypoint.yaml` - Istio waypoint Gateway (HBONE protocol on port 15008).
-
-```bash
-kubectl apply -f manifests/kagent-waypoint.yaml --context $KUBE_CONTEXT
-kubectl wait --for=condition=Programmed gateway kagent-waypoint -n kagent --timeout=120s --context $KUBE_CONTEXT
-```
-
-### Step 11: Deploy A2A Gateway and Enterprise Policies
-
-- `manifests/a2a-gateway.yaml` - Gateway + HTTPRoute for A2A traffic (port 8083, path `/api/a2a/`).
-- `manifests/a2a-authz-policy.yaml` - 5 EnterpriseAgentgatewayPolicy resources for gateway-routed A2A traffic.
+- `manifests/a2a-gateway.yaml` - enterprise-agentgateway Gateway + HTTPRoute for A2A traffic (port 8083, path `/api/a2a/`).
 
 ```bash
 kubectl apply -f manifests/a2a-gateway.yaml --context $KUBE_CONTEXT
-kubectl apply -f manifests/a2a-authz-policy.yaml --context $KUBE_CONTEXT
 ```
 
-### Step 12: Deploy Custom Agents
+### Step 11: Deploy Custom Agents
 
 - `manifests/team1-agent.yaml` - Authorized agent (AGENT_IDENTITY=team1)
 - `manifests/team2-not-allowed-agent.yaml` - Blocked agent (AGENT_IDENTITY=team2-not-allowed)
 
-Both agents have identical tools (k8s-agent, istio-agent, kgateway-agent, helm-agent) and identical system prompt structure. The only difference is the service account name, which is what the policy uses to distinguish them.
+Both agents have identical tools (k8s-agent, istio-agent, kgateway-agent, helm-agent) and identical system prompt structure. The only difference is the service account name, which is the SPIFFE identity the AccessPolicy uses to distinguish them.
 
 ```bash
 kubectl apply -f manifests/team1-agent.yaml --context $KUBE_CONTEXT
 kubectl apply -f manifests/team2-not-allowed-agent.yaml --context $KUBE_CONTEXT
 ```
 
-### Step 13: Label Services for Waypoint Routing
+### Step 12: Put the Target Agent Behind an Agentgateway Waypoint
 
-This is the critical step that makes policy enforcement work. Labeling agent services with `istio.io/use-waypoint` causes all inbound traffic to route through the waypoint proxy, where the AuthorizationPolicy is enforced.
-
-Without these labels, agents call each other directly (pod-to-pod) and bypass all policies.
+AccessPolicy is enforced by an agentgateway waypoint in front of the target Agent. Labeling the Agent with `kagent.solo.io/waypoint=true` makes the controller provision that waypoint (`Gateway/agent-k8s-agent-waypoint`), generate the agent's HTTPRoute, and set the service's `istio.io/use-waypoint` label automatically. No manual service labeling is required.
 
 ```bash
-kubectl label service k8s-agent istio-agent helm-agent kgateway-agent kagent-controller \
-  -n kagent \
-  --context $KUBE_CONTEXT \
-  istio.io/use-waypoint=kagent-waypoint
+kubectl label agent k8s-agent -n kagent --context $KUBE_CONTEXT \
+  kagent.solo.io/waypoint=true --overwrite
+
+kubectl wait --for=condition=Programmed gateway/agent-k8s-agent-waypoint \
+  -n kagent --timeout=120s --context $KUBE_CONTEXT
 ```
 
-### Step 14: Apply Istio AuthorizationPolicy
+### Step 13: Apply the AccessPolicy
 
-This is the actual enforcement mechanism. It targets the waypoint Gateway and denies any request from the `team2-not-allowed` service account to the k8s-agent service.
+This is the enforcement mechanism. The controller translates each `AccessPolicy` into an `EnterpriseAgentgatewayPolicy` on the target agent's HTTPRoute, enforced by the waypoint.
 
-- `manifests/istio-authz-policy.yaml` - DENY rule matching team2's SPIFFE identity (`spiffe://cluster.local/ns/kagent/sa/team2-not-allowed`).
+- `manifests/access-policy.yaml` - `ALLOW team1 -> k8s-agent` and `DENY team2-not-allowed -> k8s-agent`, matching the caller's `Agent` identity.
 
 ```bash
-kubectl apply -f manifests/istio-authz-policy.yaml --context $KUBE_CONTEXT
+kubectl apply -f manifests/access-policy.yaml --context $KUBE_CONTEXT
 ```
 
-Verify the policy is bound to the waypoint:
+Verify the policy translated and attached:
 
 ```bash
-kubectl describe authorizationpolicy -n kagent deny-team2-to-k8s-agent | grep "Message:"
-# Expected: "bound to kagent/kagent-waypoint"
+kubectl get accesspolicy deny-team2-to-k8s-agent -n kagent \
+  -o jsonpath='{.status.state}' --context $KUBE_CONTEXT
+# Expected: Applied
+
+kubectl get enterpriseagentgatewaypolicy accesspolicy-deny-team2-to-k8s-agent-waypoint \
+  -n kagent --context $KUBE_CONTEXT
+# Expected: ACCEPTED=True  ATTACHED=True
 ```
 
 ## Verification
@@ -359,10 +361,11 @@ kubectl describe authorizationpolicy -n kagent deny-team2-to-k8s-agent | grep "M
 
 ```bash
 kubectl get pods -n kagent --context $KUBE_CONTEXT
-# Should show ~21 pods (controller, 10 community agents, 2 custom agents, UI, postgres, clickhouse, waypoint, etc.)
+# controller, community agents, 2 custom agents, UI, postgres, clickhouse,
+# and the agent-k8s-agent-waypoint pod
 
 kubectl get agents -n kagent --context $KUBE_CONTEXT
-# Should show 12 agents (10 community + team1 + team2-not-allowed)
+# community agents + team1 + team2-not-allowed
 ```
 
 ### Test Policy Enforcement (CLI)
@@ -381,10 +384,12 @@ kubectl exec -n kagent deployment/team1 -- \
 #           HTTP_CODE: 200
 ```
 
+Or just run `./test.sh`.
+
 ### Test Policy Enforcement (UI)
 
 ```bash
-kubectl port-forward -n kagent svc/kagent-ui 8080:8080 --context $KUBE_CONTEXT
+kubectl port-forward -n kagent svc/solo-enterprise-ui 8080:80 --context $KUBE_CONTEXT
 # Open http://localhost:8080
 ```
 
@@ -395,89 +400,74 @@ kubectl port-forward -n kagent svc/kagent-ui 8080:8080 --context $KUBE_CONTEXT
 
 | File | Resources | Purpose |
 |------|-----------|---------|
-| `kagent-enterprise-values.yaml` | Helm values | 10 community agents, OIDC, OTel tracing, A2A gateway routing |
+| `kagent-enterprise-values.yaml` | Helm values | Community agents, OIDC, OTel tracing, A2A gateway routing |
 | `management-values.yaml` | Helm values | Solo Enterprise UI, OIDC static client for OBO tokens, ClickHouse |
 | `agentregistry-values.yaml` | Helm values | AgentRegistry with MCP servers and skill definitions |
 | `postgres-pgvector.yaml` | Namespace, PVC, Deployment, Service | PostgreSQL 16 + pgvector for AgentRegistry |
 | `team1-agent.yaml` | Agent | Authorized orchestrator with A2A tools |
 | `team2-not-allowed-agent.yaml` | Agent | Blocked orchestrator (identical config, different identity) |
-| `kagent-waypoint.yaml` | Gateway (istio-waypoint) | L7 proxy for AuthorizationPolicy enforcement |
-| `a2a-gateway.yaml` | Gateway, HTTPRoute | Enterprise agentgateway for `/api/a2a/` routing |
-| `a2a-authz-policy.yaml` | 5x EnterpriseAgentgatewayPolicy | Gateway-level ALLOW/DENY rules (CEL + JWT) |
-| `istio-authz-policy.yaml` | AuthorizationPolicy | **The actual enforcement** - DENY team2 at waypoint L7 |
+| `a2a-gateway.yaml` | Gateway, HTTPRoute | Enterprise agentgateway for `/api/a2a/` A2A data path |
+| `access-policy.yaml` | 2x AccessPolicy | ALLOW team1, DENY team2 to k8s-agent — **the enforcement** |
 
 ## How Policy Enforcement Works
 
-Agents discover each other via Kubernetes DNS and call services directly (pod-to-pod). This means EnterpriseAgentgatewayPolicy (which applies to HTTPRoute traffic) is not sufficient alone - it only covers calls routed through the gateway.
+`AccessPolicy` (`policy.kagent-enterprise.solo.io/v1alpha1`) is the native kagent-enterprise authorization resource. You declare *who* (subjects) may or may not reach *what* (targets), and the controller compiles it into the low-level enforcement resources:
 
-The actual enforcement uses **Istio AuthorizationPolicy** at the waypoint proxy:
-
-1. **Ambient mesh** assigns each pod a SPIFFE identity based on its service account
-2. **Waypoint label** on the k8s-agent service routes all inbound traffic through the waypoint proxy
-3. **AuthorizationPolicy** at the waypoint inspects the source identity and denies `team2-not-allowed`
+1. **Ambient mesh** assigns each pod a SPIFFE identity based on its service account.
+2. **Waypoint label** (`kagent.solo.io/waypoint=true`) on the target Agent makes the controller provision an agentgateway waypoint in front of it and route the service's traffic through it.
+3. **AccessPolicy** is translated by the controller into an `EnterpriseAgentgatewayPolicy` (`accesspolicy-<name>-waypoint`) on the agent's HTTPRoute. The waypoint evaluates the caller's identity and allows or denies the request.
 
 ```yaml
-# istio-authz-policy.yaml - the key resource
+# access-policy.yaml - the DENY rule
+apiVersion: policy.kagent-enterprise.solo.io/v1alpha1
+kind: AccessPolicy
+metadata:
+  name: deny-team2-to-k8s-agent
+  namespace: kagent
 spec:
-  targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: kagent-waypoint      # Enforced at L7 waypoint
+  from:
+    subjects:
+    - kind: Agent
+      name: team2-not-allowed
+      namespace: kagent
+  targetRef:
+    kind: Agent
+    name: k8s-agent
   action: DENY
-  rules:
-    - from:
-        - source:
-            principals:
-              - "cluster.local/ns/kagent/sa/team2-not-allowed"  # SPIFFE identity
-      to:
-        - operation:
-            hosts: ["k8s-agent*"]
-            ports: ["8080"]
 ```
 
-### Why Both Policy Layers Exist
+Default behavior is allow: without a deny-all baseline (a wildcard target with an empty `subjects` list), any caller not matched by a DENY is allowed. That is why team1 reaches k8s-agent with only the DENY for team2 in place; the explicit ALLOW for team1 documents intent.
 
-| Layer | Scope | Mechanism |
-|-------|-------|-----------|
-| `a2a-authz-policy.yaml` | Gateway-routed A2A calls | EnterpriseAgentgatewayPolicy with CEL + JWT claims |
-| `istio-authz-policy.yaml` | Direct pod-to-pod calls | Istio AuthorizationPolicy with SPIFFE identity |
-
-The Istio policy is defense-in-depth: even if agents bypass the gateway, the waypoint proxy still blocks unauthorized access.
+> Why not a hand-written Istio `AuthorizationPolicy`? That resource is one of the artifacts the controller *generates* (the optional L4 layer, off by default via `controller.istioAuthzTranslation.enabled`). Authoring it by hand bypasses the AccessPolicy abstraction and duplicates what the controller already produces. This lab uses the L7 AccessPolicy path, which is the primary enforcement layer in Solo Enterprise for kagent.
 
 ## Troubleshooting
 
 ### Policy Not Working
 
-Check the full enforcement chain:
-
 ```bash
-# 1. Is istio-base installed? (provides AuthorizationPolicy CRD)
-kubectl get crd authorizationpolicies.security.istio.io
-# If missing: helm install istio-base istio/base -n istio-system --version 1.29.1
+# 1. Is the AccessPolicy CRD installed?
+kubectl get crd accesspolicies.policy.kagent-enterprise.solo.io
 
-# 2. Is namespace in ambient mode?
+# 2. Is the namespace in ambient mode?
 kubectl get namespace kagent -o jsonpath='{.metadata.labels.istio\.io/dataplane-mode}'
 # Should return: ambient
 
-# 3. Is k8s-agent service labeled for waypoint?
-kubectl get svc k8s-agent -n kagent -o jsonpath='{.metadata.labels.istio\.io/use-waypoint}'
-# Should return: kagent-waypoint
+# 3. Is the target Agent labeled for an agentgateway waypoint?
+kubectl get agent k8s-agent -n kagent -o jsonpath='{.metadata.labels.kagent\.solo\.io/waypoint}'
+# Should return: true
 
-# 4. Is the AuthorizationPolicy bound to waypoint?
-kubectl describe authorizationpolicy -n kagent deny-team2-to-k8s-agent | grep "Message:"
-# Should say: "bound to kagent/kagent-waypoint"
+# 4. Did the controller provision the waypoint?
+kubectl get gateway agent-k8s-agent-waypoint -n kagent
+# CLASS should be enterprise-agentgateway-waypoint, PROGRAMMED=True
 
-# 5. Is waypoint pod running?
-kubectl get pods -n kagent -l gateway.networking.k8s.io/gateway-name=kagent-waypoint
-```
+# 5. Did the AccessPolicy translate?
+kubectl get accesspolicy -n kagent -o custom-columns=NAME:.metadata.name,STATE:.status.state
+# state should be Applied (a Failed state usually means the target Agent
+# is missing the kagent.solo.io/waypoint label)
 
-### Service Labels Lost After Helm Upgrade
-
-The `istio.io/use-waypoint` labels are applied manually (Step 13) and may be removed if the kagent Helm chart recreates services. Re-apply after upgrades:
-
-```bash
-kubectl label service k8s-agent istio-agent helm-agent kgateway-agent kagent-controller \
-  -n kagent istio.io/use-waypoint=kagent-waypoint
+# 6. Is the generated policy attached?
+kubectl get enterpriseagentgatewaypolicy -n kagent
+# accesspolicy-*-waypoint entries should show ACCEPTED=True ATTACHED=True
 ```
 
 ### Agent Pods in CreateContainerConfigError
@@ -493,6 +483,12 @@ kubectl create secret generic llm-api-keys \
 ## Cleanup
 
 ```bash
+./cleanup.sh
+```
+
+Or manually:
+
+```bash
 kubectl delete namespace kagent agentregistry agentgateway-system --context $KUBE_CONTEXT
 helm uninstall istio-base istiod-solo istio-cni ztunnel -n istio-system --kube-context $KUBE_CONTEXT
 kubectl delete namespace istio-system --context $KUBE_CONTEXT
@@ -501,7 +497,8 @@ kubectl delete namespace istio-system --context $KUBE_CONTEXT
 ## References
 
 - [Solo Enterprise for Kagent](https://docs.solo.io/kagent-enterprise/docs/latest/install/)
+- [AccessPolicies for AuthZ](https://docs.solo.io/kagent-enterprise/docs/main/security/access-policies/)
+- [Enforce AccessPolicies at the waypoint (L7)](https://docs.solo.io/kagent-enterprise/docs/main/security/access-policies/l7/)
 - [Solo Enterprise for Agentgateway](https://docs.solo.io/gateway/2.0.x/ai/about/)
 - [Istio Ambient Mesh](https://istio.io/latest/docs/ops/ambient/)
-- [Istio AuthorizationPolicy](https://istio.io/latest/docs/reference/config/security/authorization-policy/)
 - [A2A Protocol](https://a2a-protocol.org/)

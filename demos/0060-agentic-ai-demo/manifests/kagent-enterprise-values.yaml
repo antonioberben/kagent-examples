@@ -1,0 +1,136 @@
+# Kagent Enterprise Helm Values — chart version 0.4.x
+# All community agents enabled for Agentic AI Kagent demo
+
+# Global settings
+registry: cr.kagent.dev
+imagePullPolicy: IfNotPresent
+
+# Licensing
+licensing:
+  licenseKey: ""  # Will be set via --set-string
+
+# OIDC - Use auto provider (no login required for demo/testing)
+# OBO is required for enterprise agentgateway policy enforcement
+oidc:
+  enabled: true
+  provider: auto
+  issuer: "http://solo-enterprise-ui.kagent.svc.cluster.local:5556"
+  clientId: "kagent-enterprise"
+  secretRef: "kagent-enterprise-oidc-secret"
+  secretKey: "clientSecret"
+  skipOBO: false
+
+# Controller configuration
+controller:
+  replicas: 1
+  loglevel: debug
+  # Route A2A traffic through enterprise-agentgateway for policy enforcement
+  a2aBaseUrl: "http://kagent-a2a-gateway.kagent.svc.cluster.local:8083"
+  streaming:
+    maxBufSize: 1Mi
+    initialBufSize: 4Ki
+    timeout: 600s
+  service:
+    type: ClusterIP
+    port: 8083
+
+# LLM providers - OpenAI configuration
+providers:
+  default: openAI
+  openAI:
+    provider: OpenAI
+    model: "gpt-4o-mini"
+    apiKeySecretRef: llm-api-keys
+    apiKeySecretKey: OPENAI_API_KEY
+
+# Built-in tools MCP server
+kagent-tools:
+  enabled: true
+  fullnameOverride: kagent-tools
+  replicaCount: 1
+  tools:
+    loglevel: debug
+  service:
+    type: ClusterIP
+    port: 8084
+
+# Community agents — in chart 0.4.x each agent is a top-level key
+# (the 0.3.x `agents.<name>` parent was removed).
+k8s-agent:
+  enabled: true
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits:   {cpu: 1000m, memory: 1Gi}
+
+kgateway-agent:
+  enabled: true
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits:   {cpu: 1000m, memory: 1Gi}
+
+istio-agent:
+  enabled: true
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits:   {cpu: 1000m, memory: 1Gi}
+
+helm-agent:
+  enabled: true
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits:   {cpu: 1000m, memory: 1Gi}
+
+# Disabled — uses RemoteMCPServer "kagent-grafana-mcp". 0.4.x ships a
+# bundled grafana-mcp subchart that provisions it when this flag is on,
+# but the demo doesn't exercise observability; keep off to reduce noise.
+observability-agent:
+  enabled: false
+
+promql-agent:
+  enabled: true
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits:   {cpu: 1000m, memory: 1Gi}
+
+argo-rollouts-agent:
+  enabled: true
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits:   {cpu: 1000m, memory: 1Gi}
+
+cilium-policy-agent:
+  enabled: true
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits:   {cpu: 1000m, memory: 1Gi}
+
+cilium-manager-agent:
+  enabled: true
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits:   {cpu: 1000m, memory: 1Gi}
+
+cilium-debug-agent:
+  enabled: true
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits:   {cpu: 1000m, memory: 1Gi}
+
+# OpenTelemetry configuration for distributed tracing
+otel:
+  tracing:
+    enabled: true
+    exporter:
+      otlp:
+        # Send traces to telemetry collector (http:// prefix required)
+        endpoint: http://solo-enterprise-telemetry-collector.kagent.svc.cluster.local:4317
+        insecure: true
+
+# UI configuration
+ui:
+  enabled: true
+  replicas: 1
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 8080
