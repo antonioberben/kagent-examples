@@ -1,6 +1,7 @@
 ## Custom for kagent examples
 mcp-servers/kmcp/echo-mcp-server/
 .playwright-mcp/
+!.env.example
 
 
 .env
