@@ -1,0 +1,9 @@
+[project]
+name = "dice"
+version = "0.1"
+description = "dice agent"
+readme = "README.md"
+dependencies = [
+  "google-adk>=1.8.0",
+]
+

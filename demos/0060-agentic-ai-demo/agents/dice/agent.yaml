@@ -1,0 +1,8 @@
+agentName: dice
+image: docker.io/antonioberben/dice:0.1.0
+language: python
+framework: adk
+modelProvider: openai
+modelName: gpt-4o-mini
+description: Dice roller + prime checker demo agent (AgentRegistry BYO)
+updatedAt: 2026-06-04T15:41:09.089686+02:00
