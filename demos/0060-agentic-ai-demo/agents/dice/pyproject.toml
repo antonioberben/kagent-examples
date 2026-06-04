@@ -4,6 +4,7 @@ version = "0.1"
 description = "dice agent"
 readme = "README.md"
 dependencies = [
-  "google-adk>=1.8.0",
+  "google-adk[extensions]>=1.8.0",
+  "litellm>=1.0.0",
 ]
 
