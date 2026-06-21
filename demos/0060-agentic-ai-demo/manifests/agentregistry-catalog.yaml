@@ -1,0 +1,171 @@
+# AgentRegistry catalog — discovery/governance entries for this demo.
+#
+# ar.dev/v1alpha1 records (NOT kubernetes CRDs). Metadata only: the runtime
+# (Declarative team1/team2), the AccessPolicy and the OpenClaw harness stay
+# owned by kagent-enterprise (kubectl/Helm). AgentRegistry catalogs them.
+#
+# Applied to the running registry via its batch apply API:
+#   curl -X POST http://<registry>:12121/v0/apply \
+#        -H "Content-Type: application/yaml" -H "Authorization: Bearer $TOKEN" \
+#        --data-binary @manifests/agentregistry-catalog.yaml
+#
+# Enterprise (Solo Enterprise for agentregistry) REQUIRES auth (OIDC bearer
+# token) and VALIDATES cross-refs, so DEPENDENCIES MUST COME FIRST: the
+# MCPServer and Skills are declared before the Agents that reference them.
+# (The OSS build allowed anonymous + unordered; enterprise does not.)
+
+apiVersion: ar.dev/v1alpha1
+kind: MCPServer
+metadata:
+  name: kagent-tool-server
+  tag: latest
+  labels:
+    event: agentic-ai-kagent
+spec:
+  title: Kagent Tool Server
+  description: Kagent built-in MCP server for k8s, istio, helm and gateway operations.
+  remote:
+    type: streamable-http
+    url: http://kagent-tools.kagent.svc.cluster.local:8084/mcp
+---
+apiVersion: ar.dev/v1alpha1
+kind: Skill
+metadata:
+  name: cluster-diagnostics
+  tag: latest
+  labels:
+    event: agentic-ai-kagent
+spec:
+  title: Cluster Diagnostics
+  description: Analyze and diagnose Kubernetes cluster issues (served by k8s-agent).
+  source:
+    repository:
+      url: https://github.com/antonioberben/ai-ops
+      subfolder: demos/0060-agentic-ai-demo/manifests
+---
+apiVersion: ar.dev/v1alpha1
+kind: Skill
+metadata:
+  name: resource-management
+  tag: latest
+  labels:
+    event: agentic-ai-kagent
+spec:
+  title: Resource Management
+  description: Manage and optimize Kubernetes resources (served by k8s-agent).
+  source:
+    repository:
+      url: https://github.com/antonioberben/ai-ops
+      subfolder: demos/0060-agentic-ai-demo/manifests
+---
+apiVersion: ar.dev/v1alpha1
+kind: Skill
+metadata:
+  name: istio-traffic-management
+  tag: latest
+  labels:
+    event: agentic-ai-kagent
+spec:
+  title: Istio Traffic Management
+  description: Manage Istio traffic routing and policies (served by istio-agent).
+  source:
+    repository:
+      url: https://github.com/antonioberben/ai-ops
+      subfolder: demos/0060-agentic-ai-demo/manifests
+---
+apiVersion: ar.dev/v1alpha1
+kind: Skill
+metadata:
+  name: istio-service-mesh-configuration
+  tag: latest
+  labels:
+    event: agentic-ai-kagent
+spec:
+  title: Istio Service Mesh Configuration
+  description: Configure and manage Istio service mesh components (served by istio-agent).
+  source:
+    repository:
+      url: https://github.com/antonioberben/ai-ops
+      subfolder: demos/0060-agentic-ai-demo/manifests
+---
+apiVersion: ar.dev/v1alpha1
+kind: Skill
+metadata:
+  name: helm-release-management
+  tag: latest
+  labels:
+    event: agentic-ai-kagent
+spec:
+  title: Helm Release Management
+  description: Install, upgrade, and manage Helm releases (served by helm-agent).
+  source:
+    repository:
+      url: https://github.com/antonioberben/ai-ops
+      subfolder: demos/0060-agentic-ai-demo/manifests
+---
+apiVersion: ar.dev/v1alpha1
+kind: Skill
+metadata:
+  name: gateway-configuration
+  tag: latest
+  labels:
+    event: agentic-ai-kagent
+spec:
+  title: Gateway Configuration
+  description: Configure Kubernetes Gateway API resources (served by kgateway-agent).
+  source:
+    repository:
+      url: https://github.com/antonioberben/ai-ops
+      subfolder: demos/0060-agentic-ai-demo/manifests
+---
+apiVersion: ar.dev/v1alpha1
+kind: Agent
+metadata:
+  name: team1
+  tag: latest
+  labels:
+    event: agentic-ai-kagent
+    team: team1
+    authorized: "true"
+spec:
+  title: Team1 Orchestrator
+  description: >-
+    Authorized A2A orchestrator for Kubernetes, Istio, Gateway API and Helm.
+    Runtime is a kagent-enterprise Declarative Agent; LLM calls are fronted by
+    the in-cluster LLM agentgateway. AccessPolicy ALLOWs team1 -> k8s-agent.
+  modelProvider: OpenAI
+  modelName: gpt-4o-mini
+  source:
+    repository:
+      url: https://github.com/antonioberben/ai-ops
+      subfolder: demos/0060-agentic-ai-demo/manifests
+  mcpServers:
+    - kind: MCPServer
+      name: kagent-tool-server
+      tag: latest
+---
+apiVersion: ar.dev/v1alpha1
+kind: Agent
+metadata:
+  name: team2-not-allowed
+  tag: latest
+  labels:
+    event: agentic-ai-kagent
+    team: team2
+    authorized: "false"
+spec:
+  title: Team2 Orchestrator (not authorized)
+  description: >-
+    Identical configuration to team1 but a different SPIFFE identity. AccessPolicy
+    DENYs team2-not-allowed -> k8s-agent, so its A2A calls are rejected (403) at
+    the agentgateway waypoint. Runtime owned by kagent-enterprise.
+  modelProvider: OpenAI
+  modelName: gpt-4o-mini
+  source:
+    repository:
+      url: https://github.com/antonioberben/ai-ops
+      subfolder: demos/0060-agentic-ai-demo/manifests
+  mcpServers:
+    - kind: MCPServer
+      name: kagent-tool-server
+      tag: latest

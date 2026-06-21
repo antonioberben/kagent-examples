@@ -1,0 +1,15 @@
+# The documented connection between AgentRegistry and kagent: a Runtime of
+# type Kagent that points AgentRegistry at the kagent controller. With this,
+# AgentRegistry can deploy/manage agents INTO kagent (provider-id "kagent"),
+# and the two share the same Keycloak OIDC realm for auth.
+# ar.dev/v1alpha1 resource — apply via the registry API:
+#   curl -X POST http://<registry>:12121/v0/apply -H "Content-Type: application/yaml" \
+#        -H "Authorization: Bearer $TOKEN" --data-binary @manifests/agentregistry-kagent-runtime.yaml
+apiVersion: ar.dev/v1alpha1
+kind: Runtime
+metadata:
+  name: kagent
+spec:
+  type: Kagent
+  config:
+    kagentUrl: http://kagent-controller.kagent:8083

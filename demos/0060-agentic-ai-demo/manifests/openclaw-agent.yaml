@@ -1,0 +1,33 @@
+# AgentHarness — a long-running remote execution sandbox surfaced through the
+# kagent API/UI. Operators and chat integrations attach to it; kagent manages
+# its lifecycle. Follows the "Create an OpenClaw harness" section of
+# kagent.dev/docs/kagent/examples/agent-harness.
+#
+# Backend is `openclaw`, the backend the kagent-enterprise 0.4.4 harness
+# controller provisions (its CRD accepts `openclaw`/`nemoclaw`). The controller
+# writes the LLM gateway config into ~/.openclaw/openclaw.json once the sandbox
+# is Ready.
+#
+# Reconciles only when the controller has OPENSHELL_GATEWAY_URL set (see
+# controller.env in kagent-enterprise-values.yaml) and the OpenShell gateway +
+# upstream agent-sandbox CRDs are installed (see deploy.sh phase 11).
+#
+# The harness gets its LLM access from modelConfigRef -> default-model-config,
+# which is pointed at the in-cluster LLM agentgateway, so the harness never holds
+# the real OpenAI credential either.
+apiVersion: kagent.dev/v1alpha2
+kind: AgentHarness
+metadata:
+  name: openclaw-shell
+  namespace: kagent
+  labels:
+    event: agentic-ai-kagent
+spec:
+  backend: openclaw
+  description: "OpenClaw shell for scheduled and chat-driven workflows"
+  modelConfigRef: default-model-config
+  network:
+    # Outbound is restricted to the in-cluster LLM gateway; the harness reaches
+    # OpenAI only through the agentgateway, never directly.
+    allowedDomains:
+      - llm-agentgateway.agentgateway-system.svc.cluster.local

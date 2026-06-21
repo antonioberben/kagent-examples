@@ -1,0 +1,73 @@
+# LLM gateway — agentgateway fronting OpenAI.
+#
+# This Gateway terminates the agents' LLM traffic and injects the real OpenAI
+# credential from the openai-secret (which lives ONLY in agentgateway-system).
+# Agents point their ModelConfig baseUrl at this gateway and send a placeholder
+# token, so they never hold the real LLM credential.
+#
+# The openai-secret is created by deploy.sh (real $OPENAI_API_KEY) so the key
+# stays out of git. Endpoint (in-cluster):
+#   http://llm-agentgateway.agentgateway-system.svc.cluster.local:8080/openai/v1
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: llm-agentgateway
+  namespace: agentgateway-system
+  labels:
+    event: agentic-ai-kagent
+spec:
+  gatewayClassName: enterprise-agentgateway
+  listeners:
+    - name: llm-http
+      protocol: HTTP
+      port: 8080
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: openai
+  namespace: agentgateway-system
+  labels:
+    event: agentic-ai-kagent
+spec:
+  ai:
+    provider:
+      openai:
+        # Default model; overridden per-request by the model in the body.
+        model: gpt-4o-mini
+  policies:
+    auth:
+      # Real OpenAI key, injected by the gateway. Created by deploy.sh.
+      secretRef:
+        name: openai-secret
+    ai:
+      # Map the suffix after the /openai route prefix to provider endpoints.
+      routes:
+        "/v1/chat/completions": "Completions"
+        "/v1/models": "Passthrough"
+        "*": "Passthrough"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: agentgateway-system
+  labels:
+    event: agentic-ai-kagent
+spec:
+  parentRefs:
+    - name: llm-agentgateway
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+      backendRefs:
+        - name: openai
+          namespace: agentgateway-system
+          group: agentgateway.dev
+          kind: AgentgatewayBackend

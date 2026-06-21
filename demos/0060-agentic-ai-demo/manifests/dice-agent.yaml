@@ -1,0 +1,46 @@
+# Dice agent — built, pushed and published through AgentRegistry, then run in the
+# cluster as a kagent BYO Agent.
+#
+# AgentRegistry supply chain (see agents/dice/):
+#   arctl agent init adk python dice  ->  build --push (docker.io/antonioberben/dice:0.1.0)
+#   ->  publish  (recorded in the registry: arctl agent show dice)
+#
+# arctl 0.1.9 has no `agent deploy --runtime kubernetes` ("not yet implemented"),
+# so the actual cluster deployment is the kagent-native BYO path with the SAME
+# published image. The container's ENTRYPOINT is `kagent-adk run --host 0.0.0.0
+# --port 8080` + CMD `dice`; we restate it as cmd/args so it's explicit.
+#
+# LLM access is routed through the in-cluster LLM agentgateway (OPENAI_API_BASE),
+# so the agent never holds the real OpenAI key — same fronting pattern as the
+# declarative agents. The OPENAI_API_KEY here is the kagent-side placeholder from
+# the llm-api-keys secret; the gateway injects the real credential.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: dice
+  namespace: kagent
+  labels:
+    event: agentic-ai-kagent
+    deployed-via: agentregistry
+spec:
+  description: Dice roller + prime checker demo agent (AgentRegistry BYO via ADK)
+  type: BYO
+  byo:
+    deployment:
+      image: docker.io/antonioberben/dice:0.1.0
+      imagePullPolicy: IfNotPresent
+      cmd: kagent-adk
+      args: ["run", "--host", "0.0.0.0", "--port", "8080", "dice"]
+      env:
+        - name: MODEL_PROVIDER
+          value: openai
+        - name: MODEL_NAME
+          value: gpt-4o-mini
+        # Route LLM calls through the in-cluster agentgateway (no real key in the pod).
+        - name: OPENAI_API_BASE
+          value: http://llm-agentgateway.agentgateway-system.svc.cluster.local:8080/openai/v1
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-api-keys
+              key: OPENAI_API_KEY
