@@ -8,20 +8,21 @@ products:
   kagent:
     enabled: true
 
-# OIDC - Use auto provider (no login required)
+# OIDC - Keycloak (shared realm "agentregistry" with agentregistry-enterprise).
+# issuer injected at install: --set-string oidc.issuer=$KEYCLOAK_ISSUER
+# UI login becomes Keycloak SSO (admin-user/password). rbac.roleMapping maps the
+# "Groups" claim -> admins=global.Admin by default, matching the Keycloak realm.
 oidc:
   issuer: ""
-  # Register kagent-enterprise as a static client for OBO token exchange
-  staticClients:
-    - id: kagent-enterprise
-      name: "Kagent Enterprise"
-      secret: kagent-enterprise-secret
-      redirectURIs:
-        - "http://localhost:8080/callback"
-      # Allow client credentials grant for OBO token exchange
-      grantTypes:
-        - client_credentials
-        - authorization_code
+ui:
+  backend:
+    oidc:
+      clientId: kagent-backend
+      secretRef: ui-backend-oidc-secret
+      secretKey: clientSecret
+  frontend:
+    oidc:
+      clientId: kagent-ui
 
 # ClickHouse configuration (use emptyDir for demo)
 clickhouse:

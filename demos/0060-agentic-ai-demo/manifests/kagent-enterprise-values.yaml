@@ -9,13 +9,16 @@ imagePullPolicy: IfNotPresent
 licensing:
   licenseKey: ""  # Will be set via --set-string
 
-# OIDC - Use auto provider (no login required for demo/testing)
-# OBO is required for enterprise agentgateway policy enforcement
+# OIDC - Keycloak (shared realm with agentregistry, for the kagent<->agentregistry
+# connection). Controller + solo-enterprise-ui must share the SAME OIDC so OBO and
+# the agentregistry Kagent-runtime deploy authenticate. issuer is injected at
+# install time (Keycloak LB IP is environment-specific):
+#   --set-string oidc.issuer=$KEYCLOAK_ISSUER
+# OBO is required for enterprise agentgateway policy enforcement.
 oidc:
   enabled: true
-  provider: auto
-  issuer: "http://solo-enterprise-ui.kagent.svc.cluster.local:5556"
-  clientId: "kagent-enterprise"
+  issuer: ""
+  clientId: "kagent-backend"
   secretRef: "kagent-enterprise-oidc-secret"
   secretKey: "clientSecret"
   skipOBO: false
@@ -24,6 +27,18 @@ oidc:
 controller:
   replicas: 1
   loglevel: debug
+  # Point the controller at the OpenShell gateway so it registers the
+  # AgentHarness backends (openclaw/nemoclaw). When OPENSHELL_GATEWAY_URL is
+  # empty the controller does NOT register them and AgentHarness CRs stay inert.
+  # OpenShell runs plaintext gRPC in this demo (server.disableTls=true).
+  env:
+    - name: OPENSHELL_GATEWAY_URL
+      value: "dns:///openshell.openshell.svc.cluster.local:8080"
+    # OpenShell runs plaintext gRPC here, so dial without TLS. Without this the
+    # controller dials TLS against a plaintext server and crashes on a dial
+    # timeout (context deadline exceeded), taking the whole controller down.
+    - name: OPENSHELL_INSECURE
+      value: "true"
   # Route A2A traffic through enterprise-agentgateway for policy enforcement
   a2aBaseUrl: "http://kagent-a2a-gateway.kagent.svc.cluster.local:8083"
   streaming:
@@ -34,7 +49,13 @@ controller:
     type: ClusterIP
     port: 8083
 
-# LLM providers - OpenAI configuration
+# LLM providers - OpenAI, fronted by the LLM agentgateway.
+# baseUrl points every agent's default-model-config at the in-cluster LLM
+# gateway (manifests/llm-gateway.yaml) instead of api.openai.com. The real
+# OpenAI key lives only in agentgateway-system/openai-secret; here the
+# apiKeySecretRef (llm-api-keys) holds a placeholder token, so no agent ever
+# sees the real credential. config.baseUrl renders into the ModelConfig's
+# openAI.baseUrl field.
 providers:
   default: openAI
   openAI:
@@ -42,6 +63,8 @@ providers:
     model: "gpt-4o-mini"
     apiKeySecretRef: llm-api-keys
     apiKeySecretKey: OPENAI_API_KEY
+    config:
+      baseUrl: "http://llm-agentgateway.agentgateway-system.svc.cluster.local:8080/openai/v1"
 
 # Built-in tools MCP server
 kagent-tools:

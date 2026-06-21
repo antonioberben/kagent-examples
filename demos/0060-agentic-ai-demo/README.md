@@ -46,7 +46,7 @@ Both agents have the same tools, same system prompt structure, same model. The o
 | Solo Enterprise for Istio (ambient) | Zero-trust mTLS, ztunnel, SPIFFE identity per pod |
 | Solo Enterprise for Agentgateway | Per-agent agentgateway waypoint that enforces AccessPolicy, plus the A2A data-path gateway |
 | Solo Enterprise for Kagent | Agent runtime, controller (AccessPolicy translation), community agents, UI |
-| AgentRegistry | Centralized agent/skill/MCP discovery with pgvector |
+| AgentRegistry | Centralized agent/skill/MCP **discovery/catalog** with pgvector (not runtime or policy) |
 | Management UI | Solo Enterprise UI with OIDC auto provider, ClickHouse telemetry |
 
 ### Community Agents
@@ -248,10 +248,10 @@ open http://$KAGENT_URL
 
 ### Step 9: Install AgentRegistry
 
-Centralized discovery for agents, skills, and MCP servers. Uses PostgreSQL with pgvector for semantic search.
+Centralized **discovery/catalog** for agents, skills, and MCP servers, with PostgreSQL + pgvector for semantic search. AgentRegistry is the discovery layer only — it does **not** deploy the Declarative `team1`/`team2` agents, the `AccessPolicy`, or the OpenClaw harness. Those are owned by kagent-enterprise (Steps 11–13). See [How AgentRegistry fits](#how-agentregistry-fits) below.
 
 - `manifests/postgres-pgvector.yaml` - External PostgreSQL 16 with pgvector extension.
-- `manifests/agentregistry-values.yaml` - AgentRegistry configuration with MCP servers and skill registrations.
+- `manifests/agentregistry-values.yaml` - Minimal chart values (runtime config is passed via `--set` below; the catalog is seeded separately, see Step 9b).
 
 ```bash
 export AGENT_REGISTRY_JWT=$(openssl rand -hex 32)
@@ -269,8 +269,7 @@ helm upgrade --install agentregistry \
   --set-string database.postgres.url="postgres://agentregistry:agentregistry@postgres-pgvector.agentregistry.svc.cluster.local:5432/agent-registry?sslmode=disable" \
   --set database.postgres.vectorEnabled=true \
   --set service.type=LoadBalancer \
-  -f manifests/agentregistry-values.yaml \
-  --set config.disableBuiltinSeed="false"
+  -f manifests/agentregistry-values.yaml
 ```
 
 ```bash
@@ -279,25 +278,38 @@ echo $AGENT_REGISTRY_URL
 open http://$AGENT_REGISTRY_URL:12121
 ```
 
-Create a new package in the registry for the everything server:
+### Step 9b: Register the catalog (discovery)
 
->Server Name: example.com/server-everything
->Display title: everything server
->Version: 0.0.1
->Description: Everything server catalog entry
->Click "Add Package"
->Package identifier: @modelcontextprotocol/server-everything
->Package version: 2025.9.25
+Seed the registry with catalog entries for the agents, skills, and MCP server this lab runs, so the registry is the single pane to discover them.
 
-Deploy the everything server MCP server (not strictly required for the demo, but shows how to register MCP servers in the registry):
+- `manifests/agentregistry-catalog.yaml` - `ar.dev/v1alpha1` records: 2 Agents (`team1`, `team2-not-allowed`), 6 Skills, 1 MCPServer (`kagent-tool-server`). Metadata only.
+
+> Note on `arctl`: the bundled `arctl` 0.1.9 cannot target a remote registry — it starts its own local Docker daemon and has no `--registry-url` flag. So registration uses the registry's batch apply REST endpoint (`POST /v0/apply`), which is exactly what `arctl apply` wraps. `deploy.sh` does this automatically (phase 16).
 
 ```bash
-arctl deployments create user/my-mcp-server \
- --type mcp \
- --provider-id kubernetes-default \
- --namespace default \
- --version 0.1.0
+# port-forward the in-cluster registry, then apply the catalog
+kubectl --context $KUBE_CONTEXT -n agentregistry port-forward svc/agentregistry 12121:12121 &
+
+curl -fsS -X POST http://localhost:12121/v0/apply \
+  -H "Content-Type: application/yaml" \
+  -H "Authorization: Bearer $(cat .certs/agent-registry-jwt)" \
+  --data-binary @manifests/agentregistry-catalog.yaml
+
+# verify
+curl -fsS http://localhost:12121/v0/agents
+open http://localhost:12121   # the registered agents/skills/MCP appear in the UI
 ```
+
+### How AgentRegistry fits
+
+AgentRegistry and kagent-enterprise own different layers — keep them straight:
+
+| Concern | Owned by | Why |
+|---------|----------|-----|
+| Run the Declarative `team1`/`team2` agents | kagent-enterprise (`Agent` CRD) | AgentRegistry only deploys **containerized BYO** agents (`arctl agent init/build/publish/deploy`), not Declarative ones. |
+| Authorization (`AccessPolicy` ALLOW/DENY) | kagent-enterprise | AgentRegistry has no policy kind; its only deployable kinds are `Agent` and `MCPServer`. |
+| OpenClaw harness (`AgentHarness`) | kagent-enterprise | Not an AgentRegistry kind; deployed in parallel on its own track. |
+| Discover/catalog agents, skills, MCP servers | **AgentRegistry** | Central registry with pgvector semantic search; what this Step adds. |
 
 ### Step 10: Deploy the A2A Gateway
 
@@ -402,7 +414,8 @@ kubectl port-forward -n kagent svc/solo-enterprise-ui 8080:80 --context $KUBE_CO
 |------|-----------|---------|
 | `kagent-enterprise-values.yaml` | Helm values | Community agents, OIDC, OTel tracing, A2A gateway routing |
 | `management-values.yaml` | Helm values | Solo Enterprise UI, OIDC static client for OBO tokens, ClickHouse |
-| `agentregistry-values.yaml` | Helm values | AgentRegistry with MCP servers and skill definitions |
+| `agentregistry-values.yaml` | Helm values | Minimal AgentRegistry chart values (runtime config via `--set`) |
+| `agentregistry-catalog.yaml` | 2 Agent, 6 Skill, 1 MCPServer (`ar.dev/v1alpha1`) | Catalog entries seeded into the registry via `POST /v0/apply` — discovery metadata only |
 | `postgres-pgvector.yaml` | Namespace, PVC, Deployment, Service | PostgreSQL 16 + pgvector for AgentRegistry |
 | `team1-agent.yaml` | Agent | Authorized orchestrator with A2A tools |
 | `team2-not-allowed-agent.yaml` | Agent | Blocked orchestrator (identical config, different identity) |

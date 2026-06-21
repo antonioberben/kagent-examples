@@ -38,49 +38,57 @@ wait_ns_gone() {
   done
 }
 
-printf '%s == phase 1/9 — AccessPolicies ==\n' "$LOG"
+printf '%s == phase 1/10 — AccessPolicies ==\n' "$LOG"
 kubectl --context="$KUBE_CONTEXT" delete --ignore-not-found \
   -f "${REPO_ROOT}/manifests/access-policy.yaml"
 
-printf '%s == phase 2/9 — strip agent waypoint label ==\n' "$LOG"
+printf '%s == phase 2/10 — strip agent waypoint label ==\n' "$LOG"
 # Removing the label makes the controller tear down the agentgateway waypoint
 # (Gateway "agent-k8s-agent-waypoint") and revert the service routing.
 kubectl --context="$KUBE_CONTEXT" -n kagent label agent k8s-agent \
   kagent.solo.io/waypoint- 2>/dev/null || true
 
-printf '%s == phase 3/9 — custom agents ==\n' "$LOG"
+printf '%s == phase 3/10 — custom agents + OpenClaw harness ==\n' "$LOG"
+# Delete the AgentHarness first so the controller tears down its OpenShell sandbox.
+kubectl --context="$KUBE_CONTEXT" delete --ignore-not-found \
+  -f "${REPO_ROOT}/manifests/openclaw-agent.yaml"
 kubectl --context="$KUBE_CONTEXT" delete --ignore-not-found \
   -f "${REPO_ROOT}/manifests/team1-agent.yaml" \
   -f "${REPO_ROOT}/manifests/team2-not-allowed-agent.yaml"
 
-printf '%s == phase 4/9 — A2A gateway ==\n' "$LOG"
+printf '%s == phase 4/10 — A2A gateway ==\n' "$LOG"
 kubectl --context="$KUBE_CONTEXT" delete --ignore-not-found \
   -f "${REPO_ROOT}/manifests/a2a-gateway.yaml"
 
-printf '%s == phase 5/9 — agentregistry ==\n' "$LOG"
+printf '%s == phase 5/10 — agentregistry ==\n' "$LOG"
 helm --kube-context="$KUBE_CONTEXT" uninstall agentregistry -n agentregistry || true
 kubectl --context="$KUBE_CONTEXT" delete --ignore-not-found \
   -f "${REPO_ROOT}/manifests/postgres-pgvector.yaml"
 
-printf '%s == phase 6/9 — kagent + management ==\n' "$LOG"
+printf '%s == phase 6/10 — kagent + management ==\n' "$LOG"
 helm --kube-context="$KUBE_CONTEXT" uninstall kagent-mgmt -n kagent || true
 helm --kube-context="$KUBE_CONTEXT" uninstall kagent -n kagent || true
 helm --kube-context="$KUBE_CONTEXT" uninstall kagent-crds -n kagent || true
 
-printf '%s == phase 7/9 — agentgateway enterprise ==\n' "$LOG"
+printf '%s == phase 7/10 — OpenClaw harness backend (OpenShell + agent-sandbox) ==\n' "$LOG"
+helm --kube-context="$KUBE_CONTEXT" uninstall openshell -n openshell || true
+kubectl --context="$KUBE_CONTEXT" delete --ignore-not-found -f \
+  "https://github.com/kubernetes-sigs/agent-sandbox/releases/download/${AGENT_SANDBOX_VERSION:-v0.4.6}/manifest.yaml" || true
+
+printf '%s == phase 8/10 — agentgateway enterprise ==\n' "$LOG"
 helm --kube-context="$KUBE_CONTEXT" uninstall enterprise-agentgateway -n agentgateway-system || true
 helm --kube-context="$KUBE_CONTEXT" uninstall enterprise-agentgateway-crds -n agentgateway-system || true
 
-printf '%s == phase 8/9 — istio ambient stack ==\n' "$LOG"
+printf '%s == phase 9/10 — istio ambient stack ==\n' "$LOG"
 helm --kube-context="$KUBE_CONTEXT" uninstall ztunnel -n istio-system || true
 helm --kube-context="$KUBE_CONTEXT" uninstall istio-cni -n istio-system || true
 helm --kube-context="$KUBE_CONTEXT" uninstall istiod-solo -n istio-system || true
 helm --kube-context="$KUBE_CONTEXT" uninstall istio-base -n istio-system || true
 
-printf '%s == phase 9/9 — namespaces ==\n' "$LOG"
+printf '%s == phase 10/10 — namespaces ==\n' "$LOG"
 kubectl --context="$KUBE_CONTEXT" delete namespace --ignore-not-found \
-  kagent agentgateway-system agentregistry istio-system
-for ns in kagent agentgateway-system agentregistry istio-system; do
+  kagent agentgateway-system agentregistry istio-system openshell agent-sandbox-system
+for ns in kagent agentgateway-system agentregistry istio-system openshell agent-sandbox-system; do
   wait_ns_gone "$ns"
 done
 

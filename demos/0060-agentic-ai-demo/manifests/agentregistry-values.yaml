@@ -1,97 +1,17 @@
-# AgentRegistry Configuration
-# PostgreSQL backend with MCP servers and skills for community agents
-
-# AgentRegistry configuration
-registry:
-  replicas: 1
-  image:
-    registry: us-docker.pkg.dev/solo-public
-    repository: kagent-enterprise/agentregistry
-
-  database:
-    type: postgres
-    postgres:
-      host: agentregistry-postgresql.kagent.svc.cluster.local
-      port: 5432
-      database: agentregistry
-      username: agentregistry
-      password: agentregistry
-
-  service:
-    type: ClusterIP
-    port: 8080
-
-# MCP servers to register (community/demo)
-mcpServers:
-  - name: kagent-tool-server
-    description: "Kagent built-in MCP server for k8s, istio, helm operations"
-    url: "http://kagent-tools.kagent.svc.cluster.local:8084/mcp"
-    skills:
-      - k8s_get_resources
-      - k8s_apply_manifest
-      - k8s_get_pod_logs
-      - istio_get_virtualservices
-      - helm_list_releases
-
-  - name: grafana-mcp
-    description: "Grafana MCP server for observability"
-    url: "http://kagent-grafana-mcp.kagent.svc.cluster.local:3000/mcp"
-    skills:
-      - grafana_query_dashboard
-      - grafana_create_alert
-
-# Skills to register for community agents
-skills:
-  - id: cluster-diagnostics
-    name: Cluster Diagnostics
-    description: The ability to analyze and diagnose Kubernetes Cluster issues
-    tags:
-      - cluster
-      - diagnostics
-      - kubernetes
-    agentRef: k8s-agent
-
-  - id: resource-management
-    name: Resource Management
-    description: The ability to manage and optimize Kubernetes resources
-    tags:
-      - resource
-      - management
-      - kubernetes
-    agentRef: k8s-agent
-
-  - id: istio-traffic-management
-    name: Istio Traffic Management
-    description: Manage Istio traffic routing and policies
-    tags:
-      - istio
-      - service-mesh
-      - traffic
-    agentRef: istio-agent
-
-  - id: istio-service-mesh-configuration
-    name: Istio Service Mesh Configuration
-    description: Configure and manage Istio service mesh components
-    tags:
-      - istio
-      - service-mesh
-      - configuration
-    agentRef: istio-agent
-
-  - id: helm-release-management
-    name: Helm Release Management
-    description: Install, upgrade, and manage Helm releases
-    tags:
-      - helm
-      - releases
-      - deployment
-    agentRef: helm-agent
-
-  - id: gateway-configuration
-    name: Gateway Configuration
-    description: Configure Kubernetes Gateway API resources
-    tags:
-      - gateway
-      - kgateway
-      - routing
-    agentRef: kgateway-agent
+# AgentRegistry Helm values.
+#
+# The previous content of this file (top-level `registry:`, `mcpServers:`,
+# `skills:` keys) was INERT — the agentregistry chart has no such values
+# (its schema is config.* / database.* / image.* / service.*), so Helm
+# silently ignored them and nothing was ever registered.
+#
+# Runtime configuration (database, service type, JWT key) is passed by
+# deploy.sh via `--set` (see phase "agentregistry + postgres").
+#
+# The catalog (agents, skills, MCP servers) is NOT seeded through Helm. It is
+# applied to the running registry via its batch apply API from
+# manifests/agentregistry-catalog.yaml (see deploy.sh "register catalog" phase).
+#
+# This file is intentionally minimal; keep only real chart keys here if you
+# need to override defaults.
+replicaCount: 1
