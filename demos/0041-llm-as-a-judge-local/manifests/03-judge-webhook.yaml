@@ -1,0 +1,89 @@
+# The judge webhook.
+#
+# The code lives in a ConfigMap called `judge-code`, which you create from
+# lab/judge/judge.py before applying this file:
+#
+#   kubectl -n agentgateway-system create configmap judge-code \
+#     --from-file=judge.py=lab/judge/judge.py \
+#     --dry-run=client -o yaml | kubectl apply -f -
+#
+# No image build, no pip install at startup: judge.py is standard library only.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: judge-webhook
+  namespace: agentgateway-system
+  labels:
+    app: judge-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: judge-webhook
+  template:
+    metadata:
+      labels:
+        app: judge-webhook
+      annotations:
+        # Bump this when you edit the ConfigMap so the pod actually restarts.
+        judge/code-revision: "2"
+    spec:
+      containers:
+      - name: judge
+        image: python:3.12.12-slim
+        command: ["python", "-u", "/app/judge.py"]
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        # observe | annotate | block
+        - name: MODE
+          value: "observe"
+        - name: THRESHOLD
+          value: "3"
+        - name: JUDGE_MODEL
+          value: "qwen2.5:3b"
+        - name: OLLAMA_URL
+          value: "http://ollama.agentgateway-system.svc.cluster.local:11434/v1/chat/completions"
+        # A small model on CPU is not fast, and this is not the only timeout in
+        # play: agentgateway caps the guardrail webhook call at 10s, hard-coded in
+        # the proxy and not configurable from the policy. Keep this below that, or
+        # the gateway gives up first and your verdict arrives after the answer has
+        # already gone out.
+        - name: JUDGE_TIMEOUT
+          value: "8"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 5
+        volumeMounts:
+        - name: code
+          mountPath: /app
+      volumes:
+      - name: code
+        configMap:
+          name: judge-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: judge-webhook
+  namespace: agentgateway-system
+  labels:
+    app: judge-webhook
+spec:
+  type: ClusterIP
+  selector:
+    app: judge-webhook
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
