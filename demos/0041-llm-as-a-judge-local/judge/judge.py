@@ -2,7 +2,13 @@
 
 agentgateway calls POST /request before the model and POST /response after it.
 This service only does real work on /response: it reads the answer, asks a
-small local model to grade it, and returns one `action` object.
+small local model to score it, and returns one `action` object.
+
+What it scores is one thing: does the answer state specifics it cannot possibly
+support? Figures, percentages, money amounts, dates or claims about named
+organisations, given without a source. Not truth, and not quality: this service
+never sees the user's question. Refusing or hedging scores well. Unsourced
+precision does not.
 
 The action is an untagged union on agentgateway's side, so the SHAPE of what
 you return is the decision:
@@ -117,7 +123,7 @@ def ask_judge(answer):
 def annotate(payload, verdict):
     """Rewrite every choice, appending the verdict to the text the user sees."""
     note = (
-        f"\n\n---\nGrounding check ({JUDGE_MODEL}): {verdict['score']}/5. "
+        f"\n\n---\nUnsourced figures check ({JUDGE_MODEL}): {verdict['score']}/5. "
         f"{verdict['reason']}"
     )
     choices = []
@@ -156,7 +162,7 @@ def decide(payload):
     if MODE == "block" and verdict["score"] < THRESHOLD:
         return {
             "action": {
-                "body": "This answer did not pass quality review.",
+                "body": "This answer was withheld: it states figures without a source.",
                 "status_code": 403,
                 "reason": f"score {verdict['score']}/5 below threshold {THRESHOLD}",
             }

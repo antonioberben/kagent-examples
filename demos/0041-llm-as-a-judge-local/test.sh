@@ -319,7 +319,7 @@ else
   fi
 
   expect_eq 'observe: nothing is appended to the answer' 'clean' \
-    "$(grep -q 'Grounding check' <<<"$content" && echo 'annotated' || echo 'clean')"
+    "$(grep -q 'Unsourced figures check' <<<"$content" && echo 'annotated' || echo 'clean')"
   rm -f "$body"
 
   # ---------------------------------------------------------------------------
@@ -332,7 +332,7 @@ else
 
   content="$(jq -r '.choices[0].message.content // ""' "$body")"
   expect_eq 'annotate: verdict is appended to the answer' 'annotated' \
-    "$(grep -q 'Grounding check' <<<"$content" && echo 'annotated' || echo 'clean')"
+    "$(grep -q 'Unsourced figures check' <<<"$content" && echo 'annotated' || echo 'clean')"
 
   expect_eq 'annotate: the appended verdict names the judge model' 'yes' \
     "$(grep -qF "$JUDGE_MODEL" <<<"$content" && echo yes || echo no)"
@@ -346,7 +346,7 @@ else
   read -r code body <<<"$(ask_gateway "$FABRICATED_PROMPT")"
   expect_eq 'block: fabricated answer is rejected with 403' '403' "$code"
   expect_eq 'block: the caller gets the refusal text, not the answer' 'yes' \
-    "$(grep -qF 'did not pass quality review' "$body" && echo yes || echo no)"
+    "$(grep -qF 'states figures without a source' "$body" && echo yes || echo no)"
   rm -f "$body"
 
   read -r code body <<<"$(ask_gateway "$HONEST_PROMPT")"

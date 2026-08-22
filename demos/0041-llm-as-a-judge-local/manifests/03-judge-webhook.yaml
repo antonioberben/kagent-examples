@@ -26,7 +26,7 @@ spec:
         app: judge-webhook
       annotations:
         # Bump this when you edit the ConfigMap so the pod actually restarts.
-        judge/code-revision: "2"
+        judge/code-revision: "3"
     spec:
       containers:
       - name: judge

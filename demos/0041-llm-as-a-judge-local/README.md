@@ -1,7 +1,13 @@
 # Lab: LLM-as-a-judge as a response guardrail with agentgateway
 
-Runnable companion to the write-up *Your LLM judge reads every answer. Keep it in the
-cluster.*, which has the narrative and every command in order. This file is just the map.
+Runnable companion to the write-up *How to catch the numbers your provider's model makes
+up, with a second model in your cluster*, which has the narrative and every command in
+order. This file is just the map.
+
+What it catches, precisely: **answers that state specifics they cannot possibly support**.
+Figures, percentages, money amounts, dates or claims about named organisations, given
+without a source. Not truth, and not quality: the checker never sees the question. Refusing
+or hedging scores well. Unsourced precision does not.
 
 Everything here is open source agentgateway (`agentgateway.dev` API group). No image
 build: the webhook is standard-library Python in a ConfigMap. You need one provider API
