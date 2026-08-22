@@ -36,11 +36,13 @@ spec:
         - name: http
           containerPort: 11434
         env:
-        # Ollama unloads an idle model by default. A cold load in front of a
-        # user who is already waiting for their answer is exactly the latency
-        # you did not budget for, so pin it resident.
+        # Ollama unloads an idle model after five minutes by default. Measured on
+        # this lab: cold load plus inference is 11.6s, warm is 0.6s. That matters
+        # more than it looks, because agentgateway caps the guardrail call at 10s:
+        # a cold model does not make the user wait, it makes the guardrail fail
+        # open and the answer go out ungraded. -1 keeps it loaded for good.
         - name: OLLAMA_KEEP_ALIVE
-          value: "30m"
+          value: "-1"
         resources:
           requests:
             cpu: "2"

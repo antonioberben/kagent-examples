@@ -277,8 +277,10 @@ expect_eq 'unknown path is a 404' '404' \
 
 # The scores themselves: assert the direction, never the exact number. A 3b model
 # is noisy at the margin, and pinning an exact score makes this test lie later.
+# `|| true`: a verdict with no score at all (judge timed out, model cold) must be
+# reported as a failure, not abort the run through set -e with nothing on screen.
 fab_verdict="$(ask_judge "$FABRICATED_ANSWER")"
-fab_score="$(echo "$fab_verdict" | jq -r '.action.reason' | grep -oE '[0-9]+/5' | cut -d/ -f1)"
+fab_score="$(echo "$fab_verdict" | jq -r '.action.reason' | grep -oE '[0-9]+/5' | cut -d/ -f1 || true)"
 if [[ -n "$fab_score" && "$fab_score" -lt "$THRESHOLD" ]]; then
   pass "fabricated answer scores below threshold — ${fab_score}/5 < ${THRESHOLD}"
 else
@@ -286,7 +288,7 @@ else
 fi
 
 honest_verdict="$(ask_judge "$HONEST_ANSWER")"
-honest_score="$(echo "$honest_verdict" | jq -r '.action.reason' | grep -oE '[0-9]+/5' | cut -d/ -f1)"
+honest_score="$(echo "$honest_verdict" | jq -r '.action.reason' | grep -oE '[0-9]+/5' | cut -d/ -f1 || true)"
 if [[ -n "$honest_score" && "$honest_score" -ge "$THRESHOLD" ]]; then
   pass "honest answer scores at or above threshold — ${honest_score}/5 >= ${THRESHOLD}"
 else

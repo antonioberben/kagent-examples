@@ -151,9 +151,14 @@ gives up first, applies `failureMode`, and your verdict arrives in the log after
 already reached the user. The symptom is nasty precisely because it looks fine, an ungraded
 answer plus a healthy-looking score a moment later.
 
-The lab ships `JUDGE_TIMEOUT=8` and `test.sh` refuses to run at 10 or above. If a 3b judge on your
-node cannot answer inside ten seconds, that is a hardware conversation, not a config one:
-vLLM on a GPU node, or grade a sample instead of everything.
+The lab ships `JUDGE_TIMEOUT=8` and `test.sh` refuses to run at 10 or above.
+
+The case where ten seconds is genuinely not enough is a **cold model**, and it is worth knowing
+before it bites you. Measured here: a warm call is 0.6s, the first call after Ollama has unloaded
+the model is 11.6s. Over the gateway's cap, so the guardrail times out and the answer goes out
+ungraded. That is why `manifests/01` sets `OLLAMA_KEEP_ALIVE=-1` instead of a timeout you cannot
+raise anyway. On a shared node where you do not want the model resident forever, warm it on a
+timer instead.
 
 ## Non-streaming only
 
