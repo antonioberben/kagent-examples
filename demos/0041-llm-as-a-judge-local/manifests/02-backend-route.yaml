@@ -1,0 +1,62 @@
+# The generator: your provider, unchanged.
+#
+# This is the only hop that leaves the cluster. The key lives in a Secret that
+# agentgateway reads, not in the agent's environment, which is most of the
+# reason to put a gateway in front of models in the first place.
+#
+# Create the Secret before applying this file. Read the key from a prompt so it
+# stays out of your shell history, and never paste it into a manifest:
+#
+#   read -rsp 'provider API key: ' PROVIDER_KEY && echo
+#   kubectl -n agentgateway-system create secret generic openai-secret \
+#     --from-literal=Authorization="$PROVIDER_KEY"
+#   unset PROVIDER_KEY
+#
+# Swapping provider later is this one resource. The judge webhook and the
+# guardrail policy do not change.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai:
+        model: gpt-4o-mini
+  # Note: policies is a sibling of ai, not a child of it.
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+# The route the guardrail policy attaches to. Keep the name stable: the
+# AgentgatewayPolicy targets it by name.
+#
+# The path match is not decoration. Without it this route is a catch-all, and a
+# catch-all in front of a paid provider is a trap: if the judge webhook's
+# OLLAMA_URL is ever wrong (a typo, or manifests/05 not applied), the judge's
+# own calls land HERE instead of failing, and every answer gets graded by
+# gpt-4o-mini at your expense, out on the internet. Verified: three graded
+# answers with a broken OLLAMA_URL billed 15k input tokens to the provider and
+# never touched Ollama. With this match in place, that mistake 404s and the
+# webhook logs "judge unavailable" instead of silently going remote.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+  - name: agentgateway-proxy
+    namespace: agentgateway-system
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /v1
+    backendRefs:
+    - name: openai
+      namespace: agentgateway-system
+      group: agentgateway.dev
+      kind: AgentgatewayBackend

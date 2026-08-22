@@ -1,0 +1,61 @@
+# OPTIONAL, and only for observability.
+#
+# By default the judge webhook calls Ollama directly, which works fine but means
+# the judge's own token usage never crosses agentgateway and therefore never
+# appears in agentgateway_gen_ai_client_token_usage. The metric shows your billed
+# spend and nothing else.
+#
+# Apply this, then point the webhook at the gateway instead of at Ollama:
+#
+#   kubectl -n agentgateway-system set env deploy/judge-webhook \
+#     OLLAMA_URL=http://agentgateway-proxy.agentgateway-system.svc.cluster.local/judge/v1/chat/completions
+#
+# and both models show up under gen_ai_request_model on the same dashboard.
+#
+# Get that URL wrong and the failure is silent AND billed, unless the provider
+# route has the path match added in manifests/02: a catch-all HTTPRoute swallows
+# the judge's calls and grades every answer with gpt-4o-mini, remotely, which is
+# the exact thing this lab exists to avoid. Measured: three graded answers on a
+# broken OLLAMA_URL, 15k input tokens on the provider, zero on Ollama. With the
+# match in place the same typo 404s and judge.py logs it.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: judge-model
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai:
+        model: qwen2.5:3b
+      host: ollama.agentgateway-system.svc.cluster.local
+      port: 11434
+      path: /v1/chat/completions
+---
+# A prefixed route so the judge traffic is distinguishable from product traffic.
+# The rewrite strips /judge before the backend applies its own path.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: judge-model
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+  - name: agentgateway-proxy
+    namespace: agentgateway-system
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /judge
+    filters:
+    - type: URLRewrite
+      urlRewrite:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /
+    backendRefs:
+    - name: judge-model
+      namespace: agentgateway-system
+      group: agentgateway.dev
+      kind: AgentgatewayBackend

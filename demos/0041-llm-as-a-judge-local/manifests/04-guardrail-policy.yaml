@@ -1,0 +1,45 @@
+# The whole point of the lab: one policy, attached to the route, that sends
+# every model response through the judge webhook before the user sees it.
+#
+# promptGuard lives under spec.backend.ai and takes `request` and `response`
+# lists. This lab only guards `response`. Add `request` if you also want to
+# grade prompts on the way in.
+#
+# NON-STREAMING ONLY, and this one matters more than it reads. There is a third
+# field next to request/response, `streaming`, and it is disabled by default to
+# keep streaming throughput intact. So a client that sends `"stream": true`
+# bypasses the judge entirely: no verdict, no log line, no 403. Every call in
+# this lab is non-streaming.
+#
+# Setting `streaming: Enabled` on this guard brings the response guards back for
+# streamed answers, with two consequences worth knowing first: the webhook is
+# then called per window of text as tokens go by, so it grades fragments rather
+# than a finished answer, and masking is not supported there at all (annotate has
+# no streaming equivalent; observe and block do).
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: judge-guardrail
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: openai
+  backend:
+    ai:
+      promptGuard:
+        response:
+        - webhook:
+            backendRef:
+              kind: Service
+              name: judge-webhook
+              port: 8000
+            # There are two places this can fail, and they are governed
+            # separately. If the judge MODEL is down, judge.py catches it and
+            # returns a pass action. If the WEBHOOK itself is down, judge.py
+            # never runs and agentgateway decides here. The default is
+            # FailClosed, so leaving this out means a dead webhook takes the
+            # product down with it. Set it explicitly either way, and make sure
+            # it matches what the webhook code does.
+            failureMode: FailOpen

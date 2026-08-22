@@ -1,0 +1,77 @@
+# The judge model, served inside the cluster.
+#
+# Nothing in agentgateway needs to know this exists: only the judge webhook
+# talks to it, over plain HTTP on the in-cluster Service DNS name. That is why
+# there is no AgentgatewayBackend for it.
+#
+# The model is pulled explicitly with `kubectl exec` after the pod is ready, so
+# the download is a visible step instead of a hidden lifecycle hook. Storage is
+# an emptyDir: delete the pod and you pull again. Swap in a PVC before anyone
+# else depends on it.
+#
+# Ollama is the lab choice because it is two commands. For real traffic, vLLM on
+# a GPU node is the same picture with a different Deployment: the webhook only
+# needs an OpenAI-compatible /v1/chat/completions endpoint.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: agentgateway-system
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:0.32.15
+        ports:
+        - name: http
+          containerPort: 11434
+        env:
+        # Ollama unloads an idle model by default. A cold load in front of a
+        # user who is already waiting for their answer is exactly the latency
+        # you did not budget for, so pin it resident.
+        - name: OLLAMA_KEEP_ALIVE
+          value: "30m"
+        resources:
+          requests:
+            cpu: "2"
+            memory: 3Gi
+          limits:
+            memory: 6Gi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: models
+          mountPath: /root/.ollama
+      volumes:
+      - name: models
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: agentgateway-system
+  labels:
+    app: ollama
+spec:
+  type: ClusterIP
+  selector:
+    app: ollama
+  ports:
+  - name: http
+    port: 11434
+    targetPort: http

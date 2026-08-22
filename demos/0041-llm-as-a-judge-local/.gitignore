@@ -1,0 +1,6 @@
+# Real values live here. The example file is the one that ships.
+.env
+.env.local
+
+__pycache__/
+*.pyc
