@@ -1,8 +1,8 @@
 # Lab: LLM-as-a-judge as a response guardrail with agentgateway
 
-Runnable companion to the write-up *How to catch the numbers your provider's model makes
-up, with a second model in your cluster*, which has the narrative and every command in
-order. This file is just the map.
+Runnable companion to
+[How to catch the numbers your provider's model makes up, with a second model in your cluster](https://dev.to/antonioberben/how-to-catch-the-numbers-your-providers-model-makes-up-with-a-second-model-in-your-cluster-2ii5),
+which has the narrative and every command in order. This file is just the map.
 
 What it catches, precisely: **answers that state specifics they cannot possibly support**.
 Figures, percentages, money amounts, dates or claims about named organisations, given
